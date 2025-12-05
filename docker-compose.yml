@@ -1,0 +1,68 @@
+services:
+  # PostgreSQL Database
+  db:
+    image: postgres:15-alpine
+    container_name: protego_db
+    environment:
+      POSTGRES_USER: protego_user
+      POSTGRES_PASSWORD: protego_pass
+      POSTGRES_DB: protego
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U protego_user -d protego"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - protego_network
+
+  # FastAPI Backend
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: protego_backend
+    environment:
+      - DATABASE_URL=postgresql://protego_user:protego_pass@db:5432/protego
+      - TWILIO_ACCOUNT_SID=your_account_sid_here
+      - TWILIO_AUTH_TOKEN=your_auth_token_here
+      - TWILIO_FROM=+1234567890
+      - TEST_MODE=true
+      - ALERT_CONFIDENCE_THRESHOLD=0.8
+      - ALERT_COUNTDOWN_SECONDS=5
+      - SECRET_KEY=your-super-secret-key-change-in-production-min-32-chars
+      - ALGORITHM=HS256
+      - ALLOWED_ORIGINS=http://localhost:5173,http://localhost:3000
+      - ENVIRONMENT=development
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - protego_network
+
+  # React Frontend
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: protego_frontend
+    ports:
+      - "5173:5173"
+    environment:
+      - VITE_API_URL=http://localhost:8000
+    depends_on:
+      - backend
+    networks:
+      - protego_network
+
+volumes:
+  postgres_data:
+
+networks:
+  protego_network:
+    driver: bridge
