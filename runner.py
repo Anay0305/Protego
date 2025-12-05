@@ -107,8 +107,21 @@ def setup_backend():
     venv_path = BACKEND_DIR / ".venv"
     if not venv_path.exists():
         venv_path = BACKEND_DIR / "venv"
-    
-    if not venv_path.exists():
+
+    # Determine pip path to check if venv is valid
+    if os.name == 'nt':
+        pip_check_path = venv_path / "Scripts" / "pip.exe"
+    else:
+        pip_check_path = venv_path / "bin" / "pip"
+
+    # Check if venv exists AND is valid (has pip)
+    venv_is_valid = venv_path.exists() and pip_check_path.exists()
+
+    if not venv_is_valid:
+        if venv_path.exists():
+            print_warning(f"Virtual environment '{venv_path.name}' is corrupted (missing pip)")
+            print_info("Removing corrupted virtual environment...")
+            shutil.rmtree(venv_path)
         # Create .venv with Python 3.12 if available
         print_info("Creating virtual environment...")
         preferred_python = os.environ.get("PROTEGO_PYTHON") or shutil.which("python3.12") or sys.executable

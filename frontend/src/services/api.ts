@@ -50,7 +50,9 @@ interface User {
   created_at: string;
 }
 
-const API_BASE_URL = (import.meta.env.VITE_API_URL as string | undefined) || 'http://localhost:8000';
+// Use /api proxy in development, full URL in production
+const API_BASE_URL = (import.meta.env.VITE_API_URL as string | undefined) || 
+  (import.meta.env.MODE === 'development' ? '/api' : 'http://localhost:8000');
 
 const api = axios.create({
   baseURL: API_BASE_URL,
@@ -71,31 +73,31 @@ api.interceptors.response.use(
 // Walk API
 export const walkAPI = {
   startWalk: (data: WalkData): Promise<AxiosResponse<WalkSession>> =>
-    api.post('/api/walks/start', data),
+    api.post('/walk/start', data),
   stopWalk: (sessionId: number): Promise<AxiosResponse<WalkSession>> =>
-    api.post('/api/walks/stop', { session_id: sessionId }),
+    api.post('/walk/stop', { session_id: sessionId }),
   getActiveSession: (userId: number): Promise<AxiosResponse<WalkSession>> =>
-    api.get(`/api/walks/active/${userId}`),
+    api.get(`/walk/active/${userId}`),
 };
 
 // Alert API
 export const alertAPI = {
   createAlert: (data: AlertData): Promise<AxiosResponse<Alert>> =>
-    api.post('/api/alerts/', data),
+    api.post('/alerts/', data),
   createInstantAlert: (data: AlertData): Promise<AxiosResponse<Alert>> =>
-    api.post('/api/alerts/instant', data),
+    api.post('/alerts/instant', data),
   getAlert: (alertId: number): Promise<AxiosResponse<Alert>> =>
-    api.get(`/api/alerts/${alertId}`),
+    api.get(`/alerts/${alertId}`),
   cancelAlert: (alertId: number): Promise<AxiosResponse<Alert>> =>
-    api.post(`/api/alerts/${alertId}/cancel`, {}),
+    api.post(`/alerts/${alertId}/cancel`, {}),
 };
 
 // User API
 export const userAPI = {
   register: (userData: UserData): Promise<AxiosResponse<User>> =>
-    api.post('/api/users/register', userData),
+    api.post('/users/register', userData),
   login: (credentials: { email: string; password: string }): Promise<AxiosResponse<User>> =>
-    api.post('/api/users/login', credentials),
+    api.post('/users/login', credentials),
   getProfile: (userId: number): Promise<AxiosResponse<User>> =>
-    api.get(`/api/users/${userId}`),
+    api.get(`/users/${userId}`),
 };

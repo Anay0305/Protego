@@ -6,6 +6,7 @@ export const ALERT_TYPES = {
   MOTION_ANOMALY: 'MOTION_ANOMALY',
   SOUND_ANOMALY: 'SOUND_ANOMALY',
   VOICE_ACTIVATION: 'VOICE_ACTIVATION',
+  SOS: 'SOS',
 } as const;
 
 export const ALERT_TYPE_LABELS: Record<keyof typeof ALERT_TYPES, string> = {

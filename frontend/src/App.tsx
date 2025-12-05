@@ -58,6 +58,9 @@ const ProteoApp = () => {
   const [authForm, setAuthForm] = useState({
     email: '',
     password: '',
+    name: '',
+    phone: '',
+    emergency_contact_number: '',
     otp: '',
     mode: 'login'
   });
@@ -261,13 +264,45 @@ const ProteoApp = () => {
   };
 
   // SOS Emergency
-  const triggerSOS = () => {
+  const triggerSOS = async () => {
     setSosActive(true);
     addAlert('emergency', 'SOS ACTIVATED - Emergency contacts notified!');
-    handleVoiceAlert();
-    setTimeout(() => {
+    
+    let currentLocation = location;
+    if (navigator.geolocation) {
+      try {
+        const position = await new Promise<GeolocationPosition>((resolve, reject) => {
+          navigator.geolocation.getCurrentPosition(resolve, reject, {
+            timeout: 5000,
+            enableHighAccuracy: true
+          });
+        });
+        currentLocation = {
+          lat: position.coords.latitude,
+          lng: position.coords.longitude,
+        };
+      } catch (err) {
+        // Use last known location
+      }
+    }
+
+    try {
+      const alert = await alertAPI.createInstantAlert({
+        user_id: user?.id || 1,
+        session_id: activeSession?.id || null,
+        type: ALERT_TYPES.SOS,
+        confidence: 1.0,
+        location_lat: currentLocation?.lat || null,
+        location_lng: currentLocation?.lng || null,
+      });
+
       addAlert('emergency', 'Emergency services contacted');
-    }, 1000);
+      setError(null);
+    } catch (err: any) {
+      const errorMsg = `Failed to send SOS: ${err.response?.data?.detail || err.message}`;
+      addAlert('error', errorMsg);
+      setError('Failed to send SOS');
+    }
   };
 
   const cancelSOS = () => {
@@ -356,10 +391,12 @@ const ProteoApp = () => {
   };
 
   const handleAuth = () => {
-    if (authForm.email && authForm.password) {
+    if (authForm.email && authForm.password && authForm.emergency_contact_number) {
       setIsAuthenticated(true);
       setCurrentView('dashboard');
       addAlert('success', 'Successfully logged in');
+    } else {
+      addAlert('error', 'Please fill in all fields including emergency contact');
     }
   };
 
@@ -400,6 +437,7 @@ const ProteoApp = () => {
                 type="email"
                 value={authForm.email}
                 onChange={(e) => setAuthForm({...authForm, email: e.target.value})}
+                onKeyPress={(e) => e.key === 'Enter' && handleAuth()}
                 className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                 placeholder="your@email.com"
               />
@@ -414,6 +452,7 @@ const ProteoApp = () => {
                   type={showPassword ? "text" : "password"}
                   value={authForm.password}
                   onChange={(e) => setAuthForm({...authForm, password: e.target.value})}
+                  onKeyPress={(e) => e.key === 'Enter' && handleAuth()}
                   className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent pr-12"
                   placeholder="••••••••"
                 />
@@ -425,6 +464,21 @@ const ProteoApp = () => {
                   {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
                 </button>
               </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Emergency Contact Number
+              </label>
+              <input
+                type="tel"
+                value={authForm.emergency_contact_number}
+                onChange={(e) => setAuthForm({...authForm, emergency_contact_number: e.target.value})}
+                onKeyPress={(e) => e.key === 'Enter' && handleAuth()}
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                placeholder="+1234567890"
+              />
+              <p className="text-xs text-gray-500 mt-1">In case of emergency, we'll contact this number</p>
             </div>
 
             <button
