@@ -1,7 +1,11 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { Shield, MapPin, Phone, Users, Bell, Lock, AlertTriangle, Map, Activity, Eye, EyeOff, LogOut } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import { Shield, Phone, Users, Bell, Lock, AlertTriangle, Map, Activity, Eye, EyeOff, LogOut, Mic, MicOff, CheckCircle, Navigation } from 'lucide-react';
+import { useUserStore } from './store/useUserStore';
+import { walkAPI, alertAPI } from './services/api';
+import { ALERT_TYPES } from './constants/alertTypes';
 
 interface User {
+  id: number;
   name: string;
   email: string;
   phone: string;
@@ -10,8 +14,8 @@ interface User {
 interface Location {
   lat: number;
   lng: number;
-  accuracy: number;
-  timestamp: string;
+  accuracy?: number;
+  timestamp?: string;
 }
 
 interface Alert {
@@ -21,24 +25,36 @@ interface Alert {
   timestamp: string;
 }
 
-const SafetyCompanionApp = () => {
+interface TrustedContact {
+  id: number;
+  name: string;
+  phone: string;
+  email: string;
+}
+
+const ProteoApp = () => {
+  const userStore = useUserStore();
+  const user = userStore.user as unknown as User | null;
+  const { isWalking, activeSession, startSession, stopSession } = userStore;
+
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [user, setUser] = useState<User | null>(null);
-  const [currentView, setCurrentView] = useState('login');
+  const [currentView, setCurrentView] = useState('dashboard');
   const [location, setLocation] = useState<Location | null>(null);
   const [safetyScore, setSafetyScore] = useState(85);
-  const [trustedContacts, setTrustedContacts] = useState([
-    { id: 1, name: 'Mom', phone: '+1234567890', email: 'mom@example.com' },
-    { id: 2, name: 'Best Friend', phone: '+0987654321', email: 'friend@example.com' }
-  ]);
-  const [walkingStatus, setWalkingStatus] = useState('safe');
   const [alerts, setAlerts] = useState<Alert[]>([]);
   const [isTracking, setIsTracking] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [sosActive, setSosActive] = useState(false);
-  const watchIdRef = useRef<number | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [voiceEnabled, setVoiceEnabled] = useState(false);
+  const [isListening, setIsListening] = useState(false);
+  const [voiceLogs, setVoiceLogs] = useState<Array<{ timestamp: string; message: string; type: string }>>([]);
+  const [walkingStatus, setWalkingStatus] = useState('safe');
+  const [trustedContacts, setTrustedContacts] = useState<TrustedContact[]>([
+    { id: 1, name: 'Emergency', phone: '+919056690327', email: 'emergency@protego.com' }
+  ]);
 
-  // Authentication
   const [authForm, setAuthForm] = useState({
     email: '',
     password: '',
@@ -46,24 +62,149 @@ const SafetyCompanionApp = () => {
     mode: 'login'
   });
 
-  const handleAuth = () => {
-    // Simulated authentication
-    setUser({
-      name: 'User',
-      email: authForm.email,
-      phone: '+1234567890'
-    });
-    setIsAuthenticated(true);
-    setCurrentView('dashboard');
-    addAlert('success', 'Successfully logged in with MFA');
+  const recognitionRef = useRef<any>(null);
+  const watchIdRef = useRef<number | null>(null);
+  const lastAlertTimeRef = useRef(0);
+  const alertCooldownMs = 30000;
+
+  // Add voice log
+  const addVoiceLog = (message: string, type: string = 'info') => {
+    const timestamp = new Date().toLocaleTimeString();
+    const logEntry = { timestamp, message, type };
+    console.log(`[Voice ${type.toUpperCase()}] ${timestamp}: ${message}`);
+    setVoiceLogs(prev => [...prev, logEntry].slice(-10));
   };
 
-  const handleLogout = () => {
-    setIsAuthenticated(false);
-    setUser(null);
-    setCurrentView('login');
-    stopTracking();
+  // Add alert
+  const addAlert = (type: string, message: string) => {
+    const newAlert = {
+      id: Date.now(),
+      type,
+      message,
+      timestamp: new Date().toLocaleTimeString()
+    };
+    setAlerts(prev => [newAlert, ...prev].slice(0, 5));
   };
+
+  // Get user's location
+  useEffect(() => {
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          setLocation({
+            lat: position.coords.latitude,
+            lng: position.coords.longitude,
+            accuracy: position.coords.accuracy,
+            timestamp: new Date().toISOString()
+          });
+        },
+        (err) => {
+          console.error('Location error:', err);
+          addAlert('error', 'Failed to get location');
+        }
+      );
+    }
+  }, []);
+
+  // Initialize authentication
+  useEffect(() => {
+    if (user) {
+      setIsAuthenticated(true);
+      setCurrentView('dashboard');
+    }
+  }, [user]);
+
+  // Initialize voice recognition
+  useEffect(() => {
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+
+    if (!SpeechRecognition) {
+      const errorMsg = 'Speech Recognition not supported in this browser';
+      console.warn(errorMsg);
+      addVoiceLog(errorMsg, 'error');
+      return;
+    }
+
+    addVoiceLog('Speech Recognition API available', 'success');
+
+    const recognition = new SpeechRecognition();
+    recognition.continuous = true;
+    recognition.interimResults = true;
+    recognition.lang = 'en-US';
+
+    recognition.onstart = () => {
+      setIsListening(true);
+      addVoiceLog('🎤 Listening started - say "help me" to trigger alert', 'success');
+    };
+
+    recognition.onend = () => {
+      setIsListening(false);
+      if (isWalking && voiceEnabled) {
+        addVoiceLog('Auto-restarting voice recognition...', 'info');
+        try {
+          recognition.start();
+        } catch (err: any) {
+          addVoiceLog(`Failed to restart: ${err.message}`, 'error');
+        }
+      }
+    };
+
+    recognition.onerror = (event: any) => {
+      addVoiceLog(`Error: ${event.error}`, 'error');
+      setIsListening(false);
+    };
+
+    recognition.onresult = (event: any) => {
+      const lastResult = event.results[event.results.length - 1];
+      const transcript = lastResult[0].transcript.toLowerCase();
+      const isFinal = lastResult.isFinal;
+
+      if (isFinal) {
+        addVoiceLog(`Heard (final): "${transcript}"`, 'info');
+      }
+
+      if (isFinal && transcript.includes('help me')) {
+        const now = Date.now();
+        const timeSinceLastAlert = now - lastAlertTimeRef.current;
+
+        if (timeSinceLastAlert < alertCooldownMs) {
+          const remainingSeconds = Math.ceil((alertCooldownMs - timeSinceLastAlert) / 1000);
+          addVoiceLog(`⏳ Alert cooldown active (${remainingSeconds}s remaining)`, 'warning');
+          return;
+        }
+
+        addVoiceLog('🛡️ "HELP ME" DETECTED! Triggering emergency alert...', 'warning');
+        lastAlertTimeRef.current = now;
+        handleVoiceAlert();
+      }
+    };
+
+    recognitionRef.current = recognition;
+
+    return () => {
+      if (recognitionRef.current) {
+        recognitionRef.current.stop();
+        addVoiceLog('Voice recognition cleaned up', 'info');
+      }
+    };
+  }, []);
+
+  // Start/stop voice recognition
+  useEffect(() => {
+    if (!recognitionRef.current) return;
+
+    if (isWalking && voiceEnabled) {
+      addVoiceLog('Starting voice recognition...', 'info');
+      try {
+        recognitionRef.current.start();
+      } catch (err: any) {
+        addVoiceLog(`Start error: ${err.message}`, 'warning');
+      }
+    } else {
+      addVoiceLog('Stopping voice recognition', 'info');
+      recognitionRef.current.stop();
+    }
+  }, [isWalking, voiceEnabled]);
 
   // Location tracking
   const startTracking = () => {
@@ -85,7 +226,7 @@ const SafetyCompanionApp = () => {
         },
         { enableHighAccuracy: true, maximumAge: 10000, timeout: 5000 }
       );
-      addAlert('info', 'Live tracking started - Location shared with trusted contacts');
+      addAlert('info', 'Live tracking started');
     } else {
       addAlert('error', 'Geolocation not supported');
     }
@@ -100,14 +241,12 @@ const SafetyCompanionApp = () => {
     addAlert('info', 'Tracking stopped');
   };
 
-  // AI Analysis simulation
+  // AI Analysis
   const analyzeLocation = (loc: Location) => {
-    // Simulated safety analysis
     const hour = new Date().getHours();
     const isNightTime = hour < 6 || hour > 20;
-    
-    // Simulate anomaly detection
     const randomFactor = Math.random();
+    
     if (randomFactor > 0.95) {
       setWalkingStatus('alert');
       setSafetyScore(45);
@@ -125,41 +264,119 @@ const SafetyCompanionApp = () => {
   const triggerSOS = () => {
     setSosActive(true);
     addAlert('emergency', 'SOS ACTIVATED - Emergency contacts notified!');
-    
-    // Simulated emergency response
+    handleVoiceAlert();
     setTimeout(() => {
-      addAlert('emergency', 'Location sent to: ' + trustedContacts.map(c => c.name).join(', '));
       addAlert('emergency', 'Emergency services contacted');
     }, 1000);
   };
 
   const cancelSOS = () => {
     setSosActive(false);
-    addAlert('success', 'SOS cancelled - False alarm reported');
+    addAlert('success', 'SOS cancelled');
   };
 
-  // Alert system
-  const addAlert = (type: string, message: string) => {
-    const newAlert = {
-      id: Date.now(),
-      type,
-      message,
-      timestamp: new Date().toLocaleTimeString()
-    };
-    setAlerts(prev => [newAlert, ...prev].slice(0, 5));
-  };
+  // Voice alert
+  const handleVoiceAlert = async () => {
+    addVoiceLog('Creating INSTANT emergency alert...', 'warning');
 
-  // Voice command simulation
-  useEffect(() => {
-    const handleKeyPress = (e) => {
-      if (e.key === 'h' && e.ctrlKey && isAuthenticated) {
-        addAlert('info', 'Voice command detected: "Help me!"');
-        triggerSOS();
+    let currentLocation = location;
+    if (navigator.geolocation) {
+      try {
+        const position = await new Promise<GeolocationPosition>((resolve, reject) => {
+          navigator.geolocation.getCurrentPosition(resolve, reject, {
+            timeout: 5000,
+            enableHighAccuracy: true
+          });
+        });
+        currentLocation = {
+          lat: position.coords.latitude,
+          lng: position.coords.longitude,
+        };
+        addVoiceLog(`Location: ${currentLocation.lat.toFixed(4)}, ${currentLocation.lng.toFixed(4)}`, 'info');
+      } catch (err) {
+        addVoiceLog('Using last known location', 'warning');
       }
-    };
-    window.addEventListener('keydown', handleKeyPress);
-    return () => window.removeEventListener('keydown', handleKeyPress);
-  }, [isAuthenticated]);
+    }
+
+    try {
+      const alert = await alertAPI.createInstantAlert({
+        user_id: user?.id || 1,
+        session_id: activeSession?.id || null,
+        type: ALERT_TYPES.VOICE_ACTIVATION,
+        confidence: 1.0,
+        location_lat: currentLocation?.lat || null,
+        location_lng: currentLocation?.lng || null,
+      });
+
+      addVoiceLog(`✅ EMERGENCY ALERT SENT! ID: ${alert.data.id}`, 'success');
+      setError(null);
+    } catch (err: any) {
+      const errorMsg = `Failed to send emergency alert: ${err.response?.data?.detail || err.message}`;
+      addVoiceLog(errorMsg, 'error');
+      setError('Failed to send emergency alert');
+    }
+  };
+
+  // Walk control
+  const handleStartWalk = async () => {
+    setLoading(true);
+    setError(null);
+
+    try {
+      const response = await walkAPI.startWalk({
+        user_id: user?.id || 1,
+        location_lat: location?.lat || null,
+        location_lng: location?.lng || null,
+      });
+
+      startSession(response.data);
+      addAlert('success', 'Walk mode started');
+    } catch (err: any) {
+      setError(err.response?.data?.detail || 'Failed to start walk session');
+      addAlert('error', 'Failed to start walk mode');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleStopWalk = async () => {
+    setLoading(true);
+    setError(null);
+
+    try {
+      await walkAPI.stopWalk(activeSession?.id || 1);
+      stopSession();
+      addAlert('success', 'Walk mode stopped');
+    } catch (err: any) {
+      setError(err.response?.data?.detail || 'Failed to stop walk session');
+      addAlert('error', 'Failed to stop walk mode');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleAuth = () => {
+    if (authForm.email && authForm.password) {
+      setIsAuthenticated(true);
+      setCurrentView('dashboard');
+      addAlert('success', 'Successfully logged in');
+    }
+  };
+
+  const handleLogout = () => {
+    setIsAuthenticated(false);
+    setCurrentView('login');
+    stopTracking();
+    if (recognitionRef.current) {
+      recognitionRef.current.stop();
+    }
+  };
+
+  const toggleVoiceRecognition = () => {
+    const newState = !voiceEnabled;
+    setVoiceEnabled(newState);
+    addVoiceLog(`Voice activation ${newState ? 'ENABLED' : 'DISABLED'}`, newState ? 'success' : 'info');
+  };
 
   // Login View
   if (!isAuthenticated) {
@@ -170,8 +387,8 @@ const SafetyCompanionApp = () => {
             <div className="bg-indigo-600 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
               <Shield className="text-white" size={32} />
             </div>
-            <h1 className="text-3xl font-bold text-gray-800">SafeGuard AI</h1>
-            <p className="text-gray-600 mt-2">Your Personal Safety Companion</p>
+            <h1 className="text-3xl font-bold text-gray-800">Protego</h1>
+            <p className="text-gray-600 mt-2">Personal Safety Companion</p>
           </div>
 
           <div className="space-y-4">
@@ -210,21 +427,6 @@ const SafetyCompanionApp = () => {
               </div>
             </div>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                <Lock className="inline mr-2" size={16} />
-                Two-Factor Authentication (OTP)
-              </label>
-              <input
-                type="text"
-                value={authForm.otp}
-                onChange={(e) => setAuthForm({...authForm, otp: e.target.value})}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                placeholder="000000"
-                maxLength={6}
-              />
-            </div>
-
             <button
               onClick={handleAuth}
               className="w-full bg-indigo-600 text-white py-3 rounded-lg font-semibold hover:bg-indigo-700 transition duration-200"
@@ -233,8 +435,7 @@ const SafetyCompanionApp = () => {
             </button>
 
             <div className="text-center text-sm text-gray-600 mt-4">
-              <p>🔒 Protected with AES-256 Encryption</p>
-              <p className="mt-1">🛡️ OAuth2 / MFA Enabled</p>
+              <p>🔒 Protected with Encryption</p>
             </div>
           </div>
         </div>
@@ -251,8 +452,8 @@ const SafetyCompanionApp = () => {
           <div className="flex items-center space-x-3">
             <Shield className="text-indigo-600" size={32} />
             <div>
-              <h1 className="text-xl font-bold text-gray-800">SafeGuard AI</h1>
-              <p className="text-xs text-gray-500">Personal Safety Companion</p>
+              <h1 className="text-xl font-bold text-gray-800">Protego</h1>
+              <p className="text-xs text-gray-500">Personal Safety System</p>
             </div>
           </div>
           <button
@@ -303,14 +504,11 @@ const SafetyCompanionApp = () => {
                   onClick={cancelSOS}
                   className="bg-white text-red-600 px-6 py-3 rounded-lg font-semibold"
                 >
-                  Cancel SOS (False Alarm)
+                  Cancel SOS
                 </button>
               </div>
             </div>
           )}
-          <p className="text-center text-sm text-gray-600 mt-2">
-            Press Ctrl+H or say "Help me!" for silent SOS
-          </p>
         </div>
 
         {/* Dashboard View */}
@@ -333,14 +531,14 @@ const SafetyCompanionApp = () => {
 
               <div className="bg-white rounded-xl p-6 shadow-sm">
                 <div className="flex items-center justify-between mb-2">
-                  <h3 className="font-semibold text-gray-700">Tracking Status</h3>
-                  <MapPin className={isTracking ? 'text-green-500' : 'text-gray-400'} />
+                  <h3 className="font-semibold text-gray-700">Walk Status</h3>
+                  <Navigation className={isWalking ? 'text-green-500' : 'text-gray-400'} />
                 </div>
                 <p className="text-2xl font-bold text-gray-800">
-                  {isTracking ? 'Active' : 'Inactive'}
+                  {isWalking ? 'Active' : 'Inactive'}
                 </p>
                 <p className="text-sm text-gray-500 mt-1">
-                  {isTracking ? 'Location shared' : 'Start tracking'}
+                  {isWalking ? 'Being monitored' : 'Start walk mode'}
                 </p>
               </div>
 
@@ -351,6 +549,114 @@ const SafetyCompanionApp = () => {
                 </div>
                 <p className="text-4xl font-bold text-gray-800">{trustedContacts.length}</p>
                 <p className="text-sm text-gray-500 mt-1">Ready to help</p>
+              </div>
+            </div>
+
+            {/* Main Walk Control */}
+            <div className="bg-white rounded-xl shadow-sm p-6">
+              <div className="flex flex-col items-center text-center">
+                <div
+                  className={`p-6 rounded-full mb-6 ${
+                    isWalking
+                      ? 'bg-green-100 text-green-600'
+                      : 'bg-gray-100 text-gray-600'
+                  }`}
+                >
+                  <Shield className="w-24 h-24" />
+                </div>
+
+                <h2 className="text-2xl font-bold mb-2">
+                  {isWalking ? 'Walk Mode Active' : 'Walk Mode Inactive'}
+                </h2>
+
+                <p className="text-gray-600 mb-6">
+                  {isWalking
+                    ? 'You are being monitored for safety.'
+                    : 'Start Walk Mode to enable safety monitoring.'}
+                </p>
+
+                {isWalking && activeSession && (
+                  <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-6 w-full">
+                    <div className="flex items-center justify-center text-green-700 mb-2">
+                      <CheckCircle className="w-5 h-5 mr-2" />
+                      <span className="font-medium">Session Active</span>
+                    </div>
+                    <p className="text-sm text-green-600">
+                      Location: {location?.lat.toFixed(4)}, {location?.lng.toFixed(4)}
+                    </p>
+                  </div>
+                )}
+
+                {/* Voice Control */}
+                {isWalking && (
+                  <div className="mb-4 w-full max-w-sm">
+                    <button
+                      onClick={toggleVoiceRecognition}
+                      className={`${
+                        voiceEnabled ? 'bg-indigo-600 text-white' : 'bg-gray-200 text-gray-600'
+                      } px-6 py-3 text-sm font-semibold w-full flex items-center justify-center gap-2 rounded-lg`}
+                    >
+                      {voiceEnabled ? (
+                        <>
+                          <Mic className="w-5 h-5" />
+                          Voice Activation: ON
+                          {isListening && <span className="ml-2 w-2 h-2 bg-red-500 rounded-full animate-pulse"></span>}
+                        </>
+                      ) : (
+                        <>
+                          <MicOff className="w-5 h-5" />
+                          Voice Activation: OFF
+                        </>
+                      )}
+                    </button>
+                  </div>
+                )}
+
+                {/* Voice Logs */}
+                {voiceEnabled && voiceLogs.length > 0 && (
+                  <div className="mt-4 bg-gray-900 text-gray-100 rounded-lg p-3 max-h-64 overflow-y-auto w-full">
+                    <div className="flex items-center justify-between mb-2">
+                      <h4 className="text-xs font-semibold text-gray-300">Voice Logs</h4>
+                      <button
+                        onClick={() => setVoiceLogs([])}
+                        className="text-xs text-gray-400 hover:text-white"
+                      >
+                        Clear
+                      </button>
+                    </div>
+                    <div className="space-y-1 font-mono text-xs">
+                      {voiceLogs.map((log, idx) => (
+                        <div
+                          key={idx}
+                          className={`flex gap-2 ${
+                            log.type === 'error' ? 'text-red-400' :
+                            log.type === 'success' ? 'text-green-400' :
+                            log.type === 'warning' ? 'text-yellow-400' :
+                            log.type === 'debug' ? 'text-gray-500' :
+                            'text-gray-300'
+                          }`}
+                        >
+                          <span className="text-gray-500">{log.timestamp}</span>
+                          <span className="flex-1">{log.message}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                <button
+                  onClick={isWalking ? handleStopWalk : handleStartWalk}
+                  disabled={loading}
+                  className={`${
+                    isWalking ? 'bg-red-600 hover:bg-red-700' : 'bg-green-600 hover:bg-green-700'
+                  } text-white px-8 py-4 text-lg font-semibold w-full max-w-sm rounded-lg transition`}
+                >
+                  {loading
+                    ? 'Please wait...'
+                    : isWalking
+                    ? 'Stop Walk Mode'
+                    : 'Start Walk Mode'}
+                </button>
               </div>
             </div>
 
@@ -381,29 +687,6 @@ const SafetyCompanionApp = () => {
                     </div>
                   ))
                 )}
-              </div>
-            </div>
-
-            {/* AI Features */}
-            <div className="bg-gradient-to-r from-indigo-500 to-purple-600 rounded-xl shadow-lg p-6 text-white">
-              <h3 className="font-semibold text-xl mb-4">🤖 AI Safety Features Active</h3>
-              <div className="grid md:grid-cols-2 gap-4">
-                <div className="bg-white/10 rounded-lg p-4 backdrop-blur">
-                  <h4 className="font-semibold mb-2">Anomaly Detection</h4>
-                  <p className="text-sm opacity-90">Monitoring movement patterns for unusual behavior</p>
-                </div>
-                <div className="bg-white/10 rounded-lg p-4 backdrop-blur">
-                  <h4 className="font-semibold mb-2">Predictive Alerts</h4>
-                  <p className="text-sm opacity-90">ML model analyzing risk zones in real-time</p>
-                </div>
-                <div className="bg-white/10 rounded-lg p-4 backdrop-blur">
-                  <h4 className="font-semibold mb-2">Voice Analysis</h4>
-                  <p className="text-sm opacity-90">Stress detection in emergency calls enabled</p>
-                </div>
-                <div className="bg-white/10 rounded-lg p-4 backdrop-blur">
-                  <h4 className="font-semibold mb-2">Crowd Intelligence</h4>
-                  <p className="text-sm opacity-90">Community safety reports integrated</p>
-                </div>
               </div>
             </div>
           </div>
@@ -442,30 +725,11 @@ const SafetyCompanionApp = () => {
                   <div className="space-y-2 text-sm">
                     <p><span className="font-medium">Latitude:</span> {location.lat.toFixed(6)}</p>
                     <p><span className="font-medium">Longitude:</span> {location.lng.toFixed(6)}</p>
-                    <p><span className="font-medium">Accuracy:</span> ±{location.accuracy.toFixed(0)}m</p>
-                    <p><span className="font-medium">Last Update:</span> {new Date(location.timestamp).toLocaleString()}</p>
-                  </div>
-                  <div className="mt-4 p-3 bg-blue-50 rounded border-l-4 border-blue-500">
-                    <p className="text-sm text-blue-800">
-                      🔒 Location encrypted end-to-end and shared only with trusted contacts
-                    </p>
+                    {location.accuracy && <p><span className="font-medium">Accuracy:</span> ±{location.accuracy.toFixed(0)}m</p>}
+                    {location.timestamp && <p><span className="font-medium">Last Update:</span> {new Date(location.timestamp).toLocaleString()}</p>}
                   </div>
                 </div>
               )}
-
-              <div className="mt-6">
-                <h4 className="font-semibold mb-3">Geofencing & Safety Zones</h4>
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between p-3 bg-green-50 rounded-lg">
-                    <span className="text-sm">Home Zone</span>
-                    <span className="text-xs text-green-600 font-medium">SAFE</span>
-                  </div>
-                  <div className="flex items-center justify-between p-3 bg-yellow-50 rounded-lg">
-                    <span className="text-sm">Downtown Area</span>
-                    <span className="text-xs text-yellow-600 font-medium">CAUTION</span>
-                  </div>
-                </div>
-              </div>
             </div>
           </div>
         )}
@@ -490,14 +754,6 @@ const SafetyCompanionApp = () => {
                   </div>
                 </div>
               ))}
-              <button className="w-full border-2 border-dashed border-gray-300 rounded-lg py-4 text-gray-600 hover:border-indigo-500 hover:text-indigo-600 transition">
-                + Add New Contact
-              </button>
-            </div>
-            <div className="mt-6 p-4 bg-indigo-50 rounded-lg">
-              <p className="text-sm text-indigo-800">
-                🔒 Contacts have RBAC permissions - only they can access your emergency data
-              </p>
             </div>
           </div>
         )}
@@ -512,14 +768,14 @@ const SafetyCompanionApp = () => {
                   <Lock className="text-green-600 mt-1" size={20} />
                   <div>
                     <h4 className="font-semibold text-gray-800">End-to-End Encryption</h4>
-                    <p className="text-sm text-gray-600">All data encrypted with AES-256</p>
+                    <p className="text-sm text-gray-600">All data encrypted securely</p>
                   </div>
                 </div>
                 <div className="flex items-start space-x-3">
                   <Shield className="text-green-600 mt-1" size={20} />
                   <div>
-                    <h4 className="font-semibold text-gray-800">Multi-Factor Authentication</h4>
-                    <p className="text-sm text-gray-600">Account protected with MFA</p>
+                    <h4 className="font-semibold text-gray-800">Location Privacy</h4>
+                    <p className="text-sm text-gray-600">Shared only with trusted contacts</p>
                   </div>
                 </div>
                 <div className="flex items-start space-x-3">
@@ -537,15 +793,11 @@ const SafetyCompanionApp = () => {
               <ul className="space-y-3 text-sm text-gray-700">
                 <li className="flex items-start">
                   <span className="text-indigo-600 mr-2">•</span>
-                  <span>Keep the app running in background for continuous protection</span>
+                  <span>Keep the app running for continuous protection</span>
                 </li>
                 <li className="flex items-start">
                   <span className="text-indigo-600 mr-2">•</span>
                   <span>Update your trusted contacts regularly</span>
-                </li>
-                <li className="flex items-start">
-                  <span className="text-indigo-600 mr-2">•</span>
-                  <span>Test the SOS button with contacts before actual emergencies</span>
                 </li>
                 <li className="flex items-start">
                   <span className="text-indigo-600 mr-2">•</span>
@@ -564,4 +816,4 @@ const SafetyCompanionApp = () => {
   );
 };
 
-export default SafetyCompanionApp;
+export default ProteoApp;
