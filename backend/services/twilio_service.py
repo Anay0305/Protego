@@ -211,9 +211,13 @@ class TwilioService:
         if location and location.get('lat') and location.get('lng'):
             location_str = f"\nLocation: https://maps.google.com/?q={location['lat']},{location['lng']}"
 
+        # Determine message title based on alert type
+        title = "🚨 PROTEGO SOS ALERT 🚨" if alert_type.upper() == "SOS" else "🚨 PROTEGO EMERGENCY ALERT 🚨"
+        message_context = "has activated SOS!" if alert_type.upper() == "SOS" else "may be in distress!"
+
         sms_message = (
-            f"🚨 PROTEGO EMERGENCY ALERT 🚨\n\n"
-            f"{user_name} ({user_phone}) may be in distress!\n"
+            f"{title}\n\n"
+            f"{user_name} ({user_phone}) {message_context}\n"
             f"Alert Type: {alert_type.upper()}\n"
             f"Time: Just now"
             f"{location_str}\n\n"

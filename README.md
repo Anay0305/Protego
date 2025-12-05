@@ -115,6 +115,18 @@ TWILIO_PHONE_NUMBER=+1234567890
 TEST_MODE=true
 ```
 
+### 📱 Join Protego Sandbox (Twilio Test Mode)
+
+Since the deployed instance runs in **Twilio Test Mode**, to receive SMS/WhatsApp alerts you need to be added to the sandbox:
+
+**Message to join:**
+```
+Send a message to: +1 (Protego Twilio Number)
+Message: "join stretch-particular"
+```
+
+This will add your phone number to the approved list for receiving alerts. Once added, you'll receive real-time emergency notifications when alerts are triggered.
+
 ### 4️⃣ Access Application
 
 - **Frontend**: http://localhost:5173
@@ -355,34 +367,110 @@ lsof -ti:5173 | xargs kill -9
 
 ## 🚀 Production Deployment
 
-### Backend (Gunicorn)
+### Deploy to VPS (Recommended)
+
+For complete VPS deployment guide, see **[DEPLOYMENT.md](./DEPLOYMENT.md)**
+
+**Quick Deploy (3 steps):**
+
+```bash
+# 1. SSH to your VPS
+ssh root@your_vps_ip
+
+# 2. Clone and run deployment script
+git clone https://github.com/YOUR_USERNAME/Protego.git
+cd Protego
+bash deploy.sh your-domain.com secure_db_password
+
+# 3. Update Twilio credentials
+nano /opt/protego/.env
+# Update TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_FROM
+docker-compose restart backend
+```
+
+**What Gets Set Up:**
+- ✅ Docker & Docker Compose
+- ✅ Nginx reverse proxy
+- ✅ SSL certificate (Let's Encrypt)
+- ✅ PostgreSQL database
+- ✅ FastAPI backend
+- ✅ React frontend
+- ✅ Automated backups
+- ✅ Health monitoring
+
+### Deployment Resources
+
+- **[DEPLOYMENT.md](./DEPLOYMENT.md)** - Complete VPS deployment guide (Nginx, SSL, Backups, Monitoring)
+- **[VPS_QUICK_REFERENCE.md](./VPS_QUICK_REFERENCE.md)** - Quick command reference for common tasks
+- **[ENV_PRODUCTION_GUIDE.md](./ENV_PRODUCTION_GUIDE.md)** - Environment variables setup & best practices
+
+### Alternative Deployment Options
+
+#### Option 1: Docker Compose (Development/Small Production)
+```bash
+docker-compose up -d
+# Access: http://localhost:5173 (frontend)
+#         http://localhost:8000 (API)
+```
+
+#### Option 2: Traditional Gunicorn + Nginx
 ```bash
 cd backend
 pip install gunicorn
-gunicorn -w 4 -b 0.0.0.0:8000 main:app
+gunicorn -w 4 -b 0.0.0.0:8000 --access-logfile - main:app
 ```
 
-### Frontend (Static Hosting)
+#### Option 3: Cloud Platforms
+
+**Vercel (Frontend):**
 ```bash
+npm i -g vercel
 cd frontend
-npm run build
-# Deploy dist/ to Vercel, Netlify, AWS S3, etc.
+vercel --prod
 ```
+
+**Railway/Render/Heroku (Backend):**
+- Use Gunicorn in `Procfile`
+- Set environment variables in dashboard
+- Configure PostgreSQL as add-on
 
 ### Environment Variables (Production)
 
-```env
-# Backend
-DATABASE_URL=postgresql://user:pass@prod-db:5432/protego
-TWILIO_ACCOUNT_SID=xxxxx
-TWILIO_AUTH_TOKEN=xxxxx
-TWILIO_PHONE_NUMBER=+xxxxxxxxxx
-TEST_MODE=false
-SECRET_KEY=your-production-secret
+See **[ENV_PRODUCTION_GUIDE.md](./ENV_PRODUCTION_GUIDE.md)** for detailed setup.
 
-# Frontend
-VITE_API_URL=https://api.yourdomain.com
+```env
+# Backend (required)
+DATABASE_URL=postgresql://protego_user:secure_password@db:5432/protego
+TWILIO_ACCOUNT_SID=your_actual_sid
+TWILIO_AUTH_TOKEN=your_actual_token
+TWILIO_FROM=+1234567890
+SECRET_KEY=generate_with_openssl_rand_-base64_32
+ALGORITHM=HS256
+
+# Security
+TEST_MODE=false
+ALLOWED_ORIGINS=https://your-domain.com,https://www.your-domain.com
+ENVIRONMENT=production
+
+# Alert Configuration
+ALERT_CONFIDENCE_THRESHOLD=0.8
+ALERT_COUNTDOWN_SECONDS=5
 ```
+
+### Production Checklist
+
+- [ ] DNS records pointing to VPS IP
+- [ ] SSL certificate installed and auto-renewal enabled
+- [ ] Database password changed from default
+- [ ] SECRET_KEY generated with strong random value
+- [ ] Twilio credentials configured (not in test mode)
+- [ ] ALLOWED_ORIGINS updated with your domain
+- [ ] CORS properly configured
+- [ ] Backups automated
+- [ ] Firewall rules configured (80, 443, 22 only)
+- [ ] Health checks configured
+- [ ] Monitoring/logging setup
+- [ ] Emergency contacts verified
 
 ## 📝 License
 

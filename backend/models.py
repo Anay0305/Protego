@@ -29,6 +29,7 @@ class AlertType(str, enum.Enum):
     MOTION_ANOMALY = "MOTION_ANOMALY"
     SOUND_ANOMALY = "SOUND_ANOMALY"
     VOICE_ACTIVATION = "VOICE_ACTIVATION"
+    SOS = "SOS"
 
 
 class User(Base):
@@ -40,6 +41,7 @@ class User(Base):
         name: User's full name
         phone: User's phone number
         email: User's email address
+        emergency_contact_number: Emergency contact phone number
         trusted_contacts: JSON array of trusted contact phone numbers
         created_at: Timestamp when user was created
         updated_at: Timestamp when user was last updated
@@ -50,6 +52,7 @@ class User(Base):
     name = Column(String, nullable=False)
     phone = Column(String, unique=True, nullable=False, index=True)
     email = Column(String, unique=True, nullable=True, index=True)
+    emergency_contact_number = Column(String, nullable=False)  # Primary emergency contact
     trusted_contacts = Column(JSON, default=list, nullable=False)  # Array of phone numbers
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())

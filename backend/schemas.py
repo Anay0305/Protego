@@ -13,6 +13,7 @@ class UserCreate(BaseModel):
     name: str = Field(..., min_length=1, max_length=100)
     phone: str = Field(..., pattern=r"^\+?[1-9]\d{1,14}$")  # E.164 format
     email: Optional[str] = Field(None, pattern=r"^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$")
+    emergency_contact_number: str = Field(..., pattern=r"^\+?[1-9]\d{1,14}$")  # E.164 format
     trusted_contacts: List[str] = Field(default_factory=list)
 
     @validator("trusted_contacts")
@@ -37,6 +38,7 @@ class UserResponse(BaseModel):
     name: str
     phone: str
     email: Optional[str]
+    emergency_contact_number: str
     trusted_contacts: List[str]
     created_at: datetime
 
