@@ -39,10 +39,9 @@ class User(Base):
     Attributes:
         id: Primary key
         name: User's full name
+        email: User's email address (used for login)
+        password_hash: Hashed password
         phone: User's phone number
-        email: User's email address
-        emergency_contact_number: Emergency contact phone number
-        trusted_contacts: JSON array of trusted contact phone numbers
         created_at: Timestamp when user was created
         updated_at: Timestamp when user was last updated
     """
@@ -50,19 +49,49 @@ class User(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String, nullable=False)
+    email = Column(String, unique=True, nullable=False, index=True)
+    password_hash = Column(String, nullable=False)
     phone = Column(String, unique=True, nullable=False, index=True)
-    email = Column(String, unique=True, nullable=True, index=True)
-    emergency_contact_number = Column(String, nullable=False)  # Primary emergency contact
-    trusted_contacts = Column(JSON, default=list, nullable=False)  # Array of phone numbers
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
     # Relationships
     walk_sessions = relationship("WalkSession", back_populates="user", cascade="all, delete-orphan")
     alerts = relationship("Alert", back_populates="user", cascade="all, delete-orphan")
+    emergency_contacts = relationship("EmergencyContact", back_populates="user", cascade="all, delete-orphan")
 
     def __repr__(self):
-        return f"<User(id={self.id}, name='{self.name}', phone='{self.phone}')>"
+        return f"<User(id={self.id}, name='{self.name}', email='{self.email}')>"
+
+
+class EmergencyContact(Base):
+    """
+    Emergency contact model for storing user's emergency contacts.
+
+    Attributes:
+        id: Primary key
+        user_id: Foreign key to User
+        name: Contact's name
+        phone: Contact's phone number
+        relationship: Relationship to user (e.g., 'Mother', 'Friend')
+        is_primary: Whether this is the primary emergency contact
+        created_at: Timestamp when contact was added
+    """
+    __tablename__ = "emergency_contacts"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    name = Column(String, nullable=False)
+    phone = Column(String, nullable=False)
+    relationship = Column(String, nullable=True)
+    is_primary = Column(Boolean, default=False, nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    # Relationships
+    user = relationship("User", back_populates="emergency_contacts")
+
+    def __repr__(self):
+        return f"<EmergencyContact(id={self.id}, name='{self.name}', phone='{self.phone}')>"
 
 
 class WalkSession(Base):

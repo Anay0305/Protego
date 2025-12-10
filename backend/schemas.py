@@ -6,40 +6,75 @@ from datetime import datetime
 from models import AlertStatus, AlertType
 
 
-# ==================== User Schemas ====================
+# ==================== Auth Schemas ====================
 
-class UserCreate(BaseModel):
-    """Schema for creating a new user."""
+class UserLogin(BaseModel):
+    """Schema for user login."""
+    email: str = Field(..., pattern=r"^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$")
+    password: str = Field(..., min_length=6)
+
+
+class UserRegister(BaseModel):
+    """Schema for user registration."""
     name: str = Field(..., min_length=1, max_length=100)
+    email: str = Field(..., pattern=r"^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$")
+    password: str = Field(..., min_length=6)
     phone: str = Field(..., pattern=r"^\+?[1-9]\d{1,14}$")  # E.164 format
-    email: Optional[str] = Field(None, pattern=r"^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$")
-    emergency_contact_number: str = Field(..., pattern=r"^\+?[1-9]\d{1,14}$")  # E.164 format
-    trusted_contacts: List[str] = Field(default_factory=list)
 
-    @validator("trusted_contacts")
-    def validate_contacts(cls, v):
-        """Validate that trusted contacts are valid phone numbers."""
-        for contact in v:
-            if not contact.startswith("+"):
-                raise ValueError("Phone numbers must be in E.164 format (e.g., +1234567890)")
-        return v
 
+class Token(BaseModel):
+    """Schema for JWT token response."""
+    access_token: str
+    token_type: str
+    user: "UserResponse"
+
+
+# ==================== User Schemas ====================
 
 class UserUpdate(BaseModel):
     """Schema for updating a user."""
     name: Optional[str] = Field(None, min_length=1, max_length=100)
-    email: Optional[str] = None
-    trusted_contacts: Optional[List[str]] = None
+    phone: Optional[str] = Field(None, pattern=r"^\+?[1-9]\d{1,14}$")
 
 
 class UserResponse(BaseModel):
     """Schema for user response."""
     id: int
     name: str
+    email: str
     phone: str
-    email: Optional[str]
-    emergency_contact_number: str
-    trusted_contacts: List[str]
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+# ==================== Emergency Contact Schemas ====================
+
+class EmergencyContactCreate(BaseModel):
+    """Schema for creating an emergency contact."""
+    name: str = Field(..., min_length=1, max_length=100)
+    phone: str = Field(..., pattern=r"^\+?[1-9]\d{1,14}$")
+    relationship: Optional[str] = Field(None, max_length=50)
+    is_primary: bool = False
+
+
+class EmergencyContactUpdate(BaseModel):
+    """Schema for updating an emergency contact."""
+    name: Optional[str] = Field(None, min_length=1, max_length=100)
+    phone: Optional[str] = Field(None, pattern=r"^\+?[1-9]\d{1,14}$")
+    relationship: Optional[str] = Field(None, max_length=50)
+    is_primary: Optional[bool] = None
+
+
+class EmergencyContactResponse(BaseModel):
+    """Schema for emergency contact response."""
+    id: int
+    user_id: int
+    name: str
+    phone: str
+    relationship: Optional[str]
+    is_primary: bool
     created_at: datetime
 
     class Config:
