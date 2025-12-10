@@ -73,7 +73,7 @@ class EmergencyContact(Base):
         user_id: Foreign key to User
         name: Contact's name
         phone: Contact's phone number
-        relationship: Relationship to user (e.g., 'Mother', 'Friend')
+        relation: Relationship to user (e.g., 'Mother', 'Friend')
         is_primary: Whether this is the primary emergency contact
         created_at: Timestamp when contact was added
     """
@@ -83,7 +83,7 @@ class EmergencyContact(Base):
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
     name = Column(String, nullable=False)
     phone = Column(String, nullable=False)
-    relationship = Column(String, nullable=True)
+    relation = Column(String, nullable=True)
     is_primary = Column(Boolean, default=False, nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 

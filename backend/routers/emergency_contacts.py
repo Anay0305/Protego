@@ -42,7 +42,7 @@ def create_emergency_contact(
         user_id=current_user.id,
         name=contact_data.name,
         phone=contact_data.phone,
-        relationship=contact_data.relationship,
+        relation=contact_data.relation,
         is_primary=contact_data.is_primary
     )
 
@@ -155,8 +155,8 @@ def update_emergency_contact(
         contact.name = contact_data.name
     if contact_data.phone is not None:
         contact.phone = contact_data.phone
-    if contact_data.relationship is not None:
-        contact.relationship = contact_data.relationship
+    if contact_data.relation is not None:
+        contact.relation = contact_data.relation
     if contact_data.is_primary is not None:
         contact.is_primary = contact_data.is_primary
 

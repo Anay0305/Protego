@@ -55,7 +55,7 @@ class EmergencyContactCreate(BaseModel):
     """Schema for creating an emergency contact."""
     name: str = Field(..., min_length=1, max_length=100)
     phone: str = Field(..., pattern=r"^\+?[1-9]\d{1,14}$")
-    relationship: Optional[str] = Field(None, max_length=50)
+    relation: Optional[str] = Field(None, max_length=50)
     is_primary: bool = False
 
 
@@ -63,7 +63,7 @@ class EmergencyContactUpdate(BaseModel):
     """Schema for updating an emergency contact."""
     name: Optional[str] = Field(None, min_length=1, max_length=100)
     phone: Optional[str] = Field(None, pattern=r"^\+?[1-9]\d{1,14}$")
-    relationship: Optional[str] = Field(None, max_length=50)
+    relation: Optional[str] = Field(None, max_length=50)
     is_primary: Optional[bool] = None
 
 
@@ -73,7 +73,7 @@ class EmergencyContactResponse(BaseModel):
     user_id: int
     name: str
     phone: str
-    relationship: Optional[str]
+    relation: Optional[str]
     is_primary: bool
     created_at: datetime
 
