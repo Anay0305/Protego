@@ -17,6 +17,7 @@ export const ALERT_TYPE_LABELS: Record<keyof typeof ALERT_TYPES, string> = {
   MOTION_ANOMALY: 'Unusual Movement',
   SOUND_ANOMALY: 'Unusual Sound',
   VOICE_ACTIVATION: 'Voice Activation',
+  SOS: 'SOS Alert',
 };
 
 export type AlertType = keyof typeof ALERT_TYPES;
