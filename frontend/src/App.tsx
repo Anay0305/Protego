@@ -51,17 +51,22 @@ const ProtegoApp = () => {
       if (token) {
         try {
           const response = await userAPI.getProfile();
-          setUser(response.data);
-          userStore.setUser(response.data as any);
+          const userData = response.data;
+          setUser(userData);
+          userStore.setUser(userData as any);
           setIsAuthenticated(true);
-        } catch (err) {
+          console.log('Auth restored:', userData.email);
+        } catch (err: any) {
+          console.error('Auth check failed:', err.message);
           localStorage.removeItem('access_token');
+          setIsAuthenticated(false);
+          setUser(null);
         }
       }
     };
 
     checkAuth();
-  }, []);
+  }, [userStore]);
 
   // Initialize location
   useEffect(() => {
@@ -248,24 +253,33 @@ const ProtegoApp = () => {
 
   const triggerSOS = async () => {
     setSosActive(true);
-    addAlert('emergency', 'SOS ACTIVATED - Emergency contacts notified!');
+    addAlert('emergency', 'SOS ACTIVATED - Getting your location...');
 
-    let currentLocation = location;
+    // Always fetch fresh location for SOS
+    let currentLocation: Location | null = null;
     if (navigator.geolocation) {
       try {
         const position = await new Promise<GeolocationPosition>((resolve, reject) => {
           navigator.geolocation.getCurrentPosition(resolve, reject, {
-            timeout: 5000,
-            enableHighAccuracy: true
+            timeout: 10000,
+            enableHighAccuracy: true,
+            maximumAge: 0
           });
         });
         currentLocation = {
           lat: position.coords.latitude,
           lng: position.coords.longitude,
+          accuracy: position.coords.accuracy
         };
-      } catch (err) {
-        // Use last known location
+        addAlert('success', `Location acquired: ${currentLocation.lat.toFixed(4)}, ${currentLocation.lng.toFixed(4)}`);
+      } catch (err: any) {
+        addAlert('warning', `Location error: ${err.message}. Using last known location.`);
+        currentLocation = location; // Fallback to last known location
       }
+    }
+
+    if (!currentLocation) {
+      addAlert('warning', 'No location available. Alert sent without location.');
     }
 
     try {
@@ -278,7 +292,7 @@ const ProtegoApp = () => {
         location_lng: currentLocation?.lng || null,
       });
 
-      addAlert('emergency', 'Emergency services contacted');
+      addAlert('emergency', `Emergency contacts notified!${currentLocation ? ' Location shared.' : ''}`);
       setError(null);
     } catch (err: any) {
       const errorMsg = `Failed to send SOS: ${err.response?.data?.detail || err.message}`;
@@ -295,23 +309,31 @@ const ProtegoApp = () => {
   const handleVoiceAlert = async () => {
     addVoiceLog('Creating INSTANT emergency alert...', 'warning');
 
-    let currentLocation = location;
+    // Always fetch fresh location for voice alert
+    let currentLocation: Location | null = null;
     if (navigator.geolocation) {
       try {
         const position = await new Promise<GeolocationPosition>((resolve, reject) => {
           navigator.geolocation.getCurrentPosition(resolve, reject, {
-            timeout: 5000,
-            enableHighAccuracy: true
+            timeout: 10000,
+            enableHighAccuracy: true,
+            maximumAge: 0
           });
         });
         currentLocation = {
           lat: position.coords.latitude,
           lng: position.coords.longitude,
+          accuracy: position.coords.accuracy
         };
-        addVoiceLog(`Location: ${currentLocation.lat.toFixed(4)}, ${currentLocation.lng.toFixed(4)}`, 'info');
-      } catch (err) {
-        addVoiceLog('Using last known location', 'warning');
+        addVoiceLog(`Location acquired: ${currentLocation.lat.toFixed(4)}, ${currentLocation.lng.toFixed(4)}`, 'success');
+      } catch (err: any) {
+        addVoiceLog(`Location error: ${err.message}. Using last known.`, 'warning');
+        currentLocation = location; // Fallback
       }
+    }
+
+    if (!currentLocation) {
+      addVoiceLog('No location available!', 'warning');
     }
 
     try {
