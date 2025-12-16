@@ -22,10 +22,8 @@ interface Alert {
 
 const ProtegoApp = () => {
   const userStore = useUserStore();
-  const { isWalking, activeSession, startSession, stopSession } = userStore;
+  const { isWalking, activeSession, startSession, stopSession, user, isAuthenticated, setUser, clearUser } = userStore;
 
-  const [user, setUser] = useState<User | null>(null);
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [currentView, setCurrentView] = useState('dashboard');
   const [location, setLocation] = useState<Location | null>(null);
   const [safetyScore, setSafetyScore] = useState(85);
@@ -52,21 +50,18 @@ const ProtegoApp = () => {
         try {
           const response = await userAPI.getProfile();
           const userData = response.data;
-          setUser(userData);
-          userStore.setUser(userData as any);
-          setIsAuthenticated(true);
+          setUser(userData as any);
           console.log('Auth restored:', userData.email);
         } catch (err: any) {
           console.error('Auth check failed:', err.message);
           localStorage.removeItem('access_token');
-          setIsAuthenticated(false);
-          setUser(null);
+          clearUser();
         }
       }
     };
 
     checkAuth();
-  }, [userStore]);
+  }, [setUser, clearUser]);
 
   // Initialize location
   useEffect(() => {
@@ -393,17 +388,13 @@ const ProtegoApp = () => {
   };
 
   const handleAuthSuccess = (token: string, userData: User) => {
-    setUser(userData);
-    userStore.setUser(userData as any);
-    setIsAuthenticated(true);
+    setUser(userData as any);
     addAlert('success', 'Successfully logged in');
   };
 
   const handleLogout = () => {
     localStorage.removeItem('access_token');
-    setUser(null);
-    userStore.clearUser();
-    setIsAuthenticated(false);
+    clearUser();
     setCurrentView('dashboard');
     stopTracking();
     if (recognitionRef.current) {
@@ -736,7 +727,7 @@ const ProtegoApp = () => {
 
         {/* Contacts View */}
         {currentView === 'contacts' && user && (
-          <TrustedContactsPage user={user} onUpdate={setUser} />
+          <TrustedContactsPage user={user} onUpdate={(updatedUser) => setUser(updatedUser as any)} />
         )}
 
         {/* Safety View */}

@@ -6,6 +6,8 @@ interface User {
   name: string;
   email: string;
   phone: string;
+  trusted_contacts: string[];
+  created_at: string;
 }
 
 interface WalkSession {
@@ -51,7 +53,13 @@ export const useUserStore = create<UserStore>()(
         set((state) => ({
           user: state.user ? { ...state.user, ...updates } : null,
         })),
-      clearUser: () => set({ user: null, isAuthenticated: false }),
+      clearUser: () => set({
+        user: null,
+        isAuthenticated: false,
+        activeSession: null,
+        isWalking: false,
+        pendingAlert: null
+      }),
 
       startSession: (session) =>
         set({ activeSession: session, isWalking: true }),

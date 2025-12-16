@@ -9,7 +9,7 @@ from contextlib import asynccontextmanager
 
 from config import settings
 from database import init_db
-from routers import users, walk, alerts, admin
+from routers import users, walk, alerts, admin, auth
 
 
 @asynccontextmanager
@@ -51,6 +51,7 @@ app.add_middleware(
 )
 
 # Include routers
+app.include_router(auth.router, prefix="/api/users", tags=["Authentication"])
 app.include_router(users.router, prefix="/api/users", tags=["Users"])
 app.include_router(walk.router, prefix="/api/walk", tags=["Walk Sessions"])
 app.include_router(alerts.router, prefix="/api/alerts", tags=["Alerts"])
