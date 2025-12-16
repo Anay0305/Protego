@@ -367,7 +367,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 For issues and questions:
 - Open an issue on GitHub
-- Email: support@protego.example.com
+- Email: me@anaygupta.xyz
 - Documentation: http://localhost:8000/docs
 
 ## 🗺️ Roadmap
