@@ -78,6 +78,11 @@ const ProtegoApp = () => {
         (err) => {
           console.error('Location error:', err);
           addAlert('error', 'Failed to get location');
+        },
+        {
+          enableHighAccuracy: true,
+          timeout: 10000,
+          maximumAge: 0
         }
       );
     }

@@ -25,6 +25,10 @@ class UserCreate(BaseModel):
         return v
 
 
+# Alias for compatibility with auth router
+UserRegister = UserCreate
+
+
 class UserLogin(BaseModel):
     """Schema for user login."""
     email: str = Field(..., pattern=r"^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$")
@@ -51,8 +55,15 @@ class UserResponse(BaseModel):
         from_attributes = True
 
 
+class Token(BaseModel):
+    """Schema for authentication token response."""
+    access_token: str
+    token_type: str = "bearer"
+    user: UserResponse
+
+
 class AuthResponse(BaseModel):
-    """Schema for authentication response."""
+    """Schema for authentication response (alias for Token)."""
     access_token: str
     token_type: str = "bearer"
     user: UserResponse
