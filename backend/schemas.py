@@ -6,79 +6,67 @@ from datetime import datetime
 from models import AlertStatus, AlertType
 
 
-# ==================== Auth Schemas ====================
+# ==================== User Schemas ====================
+
+class UserCreate(BaseModel):
+    """Schema for creating a new user (sign up)."""
+    name: str = Field(..., min_length=1, max_length=100)
+    phone: str = Field(..., pattern=r"^\+?[1-9]\d{1,14}$")  # E.164 format
+    email: str = Field(..., pattern=r"^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$")
+    password: str = Field(..., min_length=8, max_length=100)
+    trusted_contacts: List[str] = Field(default_factory=list)
+
+    @validator("trusted_contacts")
+    def validate_contacts(cls, v):
+        """Validate that trusted contacts are valid phone numbers."""
+        for contact in v:
+            if not contact.startswith("+"):
+                raise ValueError("Phone numbers must be in E.164 format (e.g., +1234567890)")
+        return v
+
 
 class UserLogin(BaseModel):
     """Schema for user login."""
     email: str = Field(..., pattern=r"^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$")
-    password: str = Field(..., min_length=6)
+    password: str = Field(..., min_length=1)
 
-
-class UserRegister(BaseModel):
-    """Schema for user registration."""
-    name: str = Field(..., min_length=1, max_length=100)
-    email: str = Field(..., pattern=r"^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$")
-    password: str = Field(..., min_length=6)
-    phone: str = Field(..., pattern=r"^\+?[1-9]\d{1,14}$")  # E.164 format
-
-
-class Token(BaseModel):
-    """Schema for JWT token response."""
-    access_token: str
-    token_type: str
-    user: "UserResponse"
-
-
-# ==================== User Schemas ====================
 
 class UserUpdate(BaseModel):
     """Schema for updating a user."""
     name: Optional[str] = Field(None, min_length=1, max_length=100)
-    phone: Optional[str] = Field(None, pattern=r"^\+?[1-9]\d{1,14}$")
+    email: Optional[str] = None
+    trusted_contacts: Optional[List[str]] = None
 
 
 class UserResponse(BaseModel):
     """Schema for user response."""
     id: int
     name: str
+    phone: str
     email: str
-    phone: str
+    trusted_contacts: List[str]
     created_at: datetime
 
     class Config:
         from_attributes = True
 
 
-# ==================== Emergency Contact Schemas ====================
+class AuthResponse(BaseModel):
+    """Schema for authentication response."""
+    access_token: str
+    token_type: str = "bearer"
+    user: UserResponse
 
-class EmergencyContactCreate(BaseModel):
-    """Schema for creating an emergency contact."""
-    name: str = Field(..., min_length=1, max_length=100)
+
+class TrustedContactAdd(BaseModel):
+    """Schema for adding a trusted contact."""
     phone: str = Field(..., pattern=r"^\+?[1-9]\d{1,14}$")
-    relation: Optional[str] = Field(None, max_length=50)
-    is_primary: bool = False
+    name: Optional[str] = None
 
 
-class EmergencyContactUpdate(BaseModel):
-    """Schema for updating an emergency contact."""
-    name: Optional[str] = Field(None, min_length=1, max_length=100)
-    phone: Optional[str] = Field(None, pattern=r"^\+?[1-9]\d{1,14}$")
-    relation: Optional[str] = Field(None, max_length=50)
-    is_primary: Optional[bool] = None
-
-
-class EmergencyContactResponse(BaseModel):
-    """Schema for emergency contact response."""
-    id: int
-    user_id: int
-    name: str
-    phone: str
-    relation: Optional[str]
-    is_primary: bool
-    created_at: datetime
-
-    class Config:
-        from_attributes = True
+class TrustedContactRemove(BaseModel):
+    """Schema for removing a trusted contact."""
+    phone: str = Field(..., pattern=r"^\+?[1-9]\d{1,14}$")
 
 
 # ==================== Walk Session Schemas ====================

@@ -1,489 +1,387 @@
 # Protego: AI-Powered Personal Safety Companion
 
+![Protego Logo](https://img.shields.io/badge/Protego-Safety%20First-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
-![Python](https://img.shields.io/badge/python-3.12-blue)
-![React](https://img.shields.io/badge/react-19.2-blue)
-![TypeScript](https://img.shields.io/badge/typescript-5.3-blue)
-![FastAPI](https://img.shields.io/badge/fastapi-0.115-green)
-![PostgreSQL](https://img.shields.io/badge/postgresql-18-blue)
+![Python](https://img.shields.io/badge/python-3.11-blue)
+![React](https://img.shields.io/badge/react-18.2-blue)
 
-A production-quality full-stack personal safety application with voice-activated emergency alerts, AI-powered distress detection, and real-time SMS/WhatsApp notifications.
+A production-quality full-stack application for personal safety monitoring with AI-powered distress detection, real-time alerts, and emergency contact notifications.
 
 ## 🚀 Features
 
-- **Walk Mode Safety Monitoring**: Start/stop safety sessions with real-time location tracking
-- **Voice-Activated Emergency Alerts**: Trigger alerts with "help me" voice command (Web Speech API)
-- **AI Distress Detection**: Detect screams, falls, motion anomalies (ML stub ready)
-- **Smart Alert System**: 5-second countdown with cancellation option
-- **Emergency Notifications**: Automatic SMS/WhatsApp alerts via Twilio
-- **Location Tracking**: Real-time GPS with accuracy metrics
-- **Trusted Contacts**: Emergency contact management
-- **Responsive UI**: Modern React 19 + TypeScript + Tailwind CSS SPA
-- **RESTful API**: FastAPI with auto-generated Swagger documentation
-- **State Management**: Zustand for global state
+### Authentication & User Management
+- **Secure Sign Up/Sign In**: JWT-based authentication with bcrypt password hashing
+- **Trusted Contacts Management**: Add/remove emergency contacts with country code selector
+- **Profile Management**: Update user information and settings
+
+### Safety Features
+- **Walk Mode Safety Monitoring**: Start/stop safety sessions with real-time tracking
+- **AI Distress Detection**: Detect screams, falls, and distress signals (ML stub included)
+- **Smart Alert System**: 5-second countdown with user cancellation option
+- **Voice Activation**: Say "help me" to trigger instant emergency alert
+- **SOS Emergency Button**: One-tap instant alert to all trusted contacts
+- **Emergency Notifications**: Automatic SMS alerts to trusted contacts via Twilio
+- **Location Tracking**: GPS integration for precise emergency location sharing
+
+### UI/UX
+- **Modern Design**: Beautiful gradient-based UI with smooth animations
+- **Country Code Selector**: Easy phone number entry for 10 major countries
+- **Responsive Layout**: Works seamlessly on mobile and desktop
+- **Real-time Updates**: Live status indicators and alerts
+- **Dashboard Analytics**: Safety score and walk session tracking
+
+### Technical
+- **RESTful API**: FastAPI backend with auto-generated Swagger documentation
+- **CORS Configuration**: Environment-based origin management
+- **Protected Routes**: JWT middleware for secure API access
 
 ## 🏗️ Architecture
 
 ```
-┌─────────────────────┐      ┌──────────────────┐      ┌──────────────┐
-│   React 19 SPA      │◄────►│   FastAPI 0.115  │◄────►│ PostgreSQL   │
-│   (TypeScript)      │      │   (Python 3.12)  │      │     (v18)    │
-└─────────────────────┘      └──────────────────┘      └──────────────┘
-         ▲                            ▲
-         │                            │
-         │                    ┌───────┴────────┐
-         │                    │                │
-         │             ┌──────▼────┐   ┌──────▼────┐
-         │             │  Twilio   │   │    ML     │
-         │             │ SMS/WhatsApp  │  Inference│
-         │             └───────────┘   └───────────┘
-         │
-         └─► Geolocation API (GPS Tracking)
-             Web Speech API (Voice Recognition)
+┌─────────────────┐      ┌─────────────────┐      ┌─────────────────┐
+│   React Web     │─────▶│   FastAPI       │─────▶│  PostgreSQL     │
+│   Frontend      │      │   Backend       │      │  Database       │
+└─────────────────┘      └─────────────────┘      └─────────────────┘
+         │                        │
+         │                        ▼
+         │               ┌─────────────────┐
+         │               │  Twilio API     │
+         │               │  (SMS/Calls)    │
+         │               └─────────────────┘
+         │                        │
+         └────────────────────────┴──────────────────────▶
+                    ML Inference Stub
+                 (Audio/Motion Analysis)
 ```
 
-## 📋 Tech Stack
+### Technology Stack
 
-| Layer | Technology | Version |
-|-------|-----------|---------|
-| **Frontend** | React + Vite + TypeScript | 19.2 / 5.1 / 5.3 |
-| **Styling** | Tailwind CSS | 3.4.1 |
-| **State** | Zustand | 4.4.7 |
-| **Icons** | Lucide React | Latest |
-| **HTTP Client** | Axios | 1.6.5 |
-| **Backend** | FastAPI + Uvicorn | 0.115.6 / 0.34.0 |
-| **Database** | PostgreSQL + SQLAlchemy | 18beta1 / 2.0.36 |
-| **Messaging** | Twilio REST API | 9.4.2 |
-| **Containerization** | Docker & Docker Compose | Latest |
+| Layer | Technology |
+|-------|-----------|
+| **Frontend** | React 18 + Vite + Tailwind CSS |
+| **State Management** | Zustand |
+| **Backend** | Python 3.11 + FastAPI |
+| **Database** | PostgreSQL 15 + SQLAlchemy |
+| **Messaging** | Twilio REST API |
+| **AI/ML** | Python stub (ready for TensorFlow/PyTorch) |
+| **Containerization** | Docker + Docker Compose |
+| **Testing** | Pytest + Jest + React Testing Library |
 
-## 🚀 Quick Start
+## 📦 Installation
 
 ### Prerequisites
-- Python 3.12+
+
+- PostgreSQL 15+
+- Python 3.11+
 - Node.js 20+
-- PostgreSQL 15+ (running on port 5432)
-- Git
+- Twilio Account (for SMS alerts)
 
-### 1️⃣ Clone & Setup
+### Quick Start (3 Steps)
 
-```bash
-git clone https://github.com/Anay0305/Protego.git
-cd Protego
-```
-
-### 2️⃣ Option A: Automated Setup (Recommended)
-
-```bash
-# Start both backend and frontend with one command
-python3 runner.py
-```
-
-This will:
-- ✅ Check Python/Node.js/PostgreSQL availability
-- ✅ Create Python virtual environment (`.venv`)
-- ✅ Install all Python dependencies
-- ✅ Install all Node.js dependencies
-- ✅ Start FastAPI backend on `http://localhost:8000`
-- ✅ Start Vite frontend on `http://localhost:5173`
-
-### 2️⃣ Option B: Manual Setup
-
-**Backend:**
+#### 1. Setup Database
 ```bash
 cd backend
-python3 -m venv .venv
-source .venv/bin/activate  # On Windows: .venv\Scripts\activate
-pip install -r requirements.txt
-python3 -m uvicorn main:app --reload --host 0.0.0.0 --port 8000
+
+# Create database and user
+sudo -u postgres createdb protego
+sudo -u postgres psql -c "CREATE USER protego_user WITH PASSWORD 'protego_pass';"
+sudo -u postgres psql -c "GRANT ALL PRIVILEGES ON DATABASE protego TO protego_user;"
+
+# Run migration to add password_hash column
+PGPASSWORD=protego_pass psql -U protego_user -d protego -h localhost -f migrate_add_password.sql
 ```
 
-**Frontend (new terminal):**
+#### 2. Start Backend
+```bash
+cd backend
+pip install -r requirements.txt
+python main.py
+```
+
+Backend runs on **http://localhost:8000**
+
+#### 3. Start Frontend
 ```bash
 cd frontend
 npm install
 npm run dev
 ```
 
-### 3️⃣ Configure Environment
+Frontend runs on **http://localhost:5173**
 
-Edit `backend/.env`:
-```env
-DATABASE_URL=postgresql://protego_user:protego_pass@localhost:5432/protego_db
-TWILIO_ACCOUNT_SID=your_account_sid
-TWILIO_AUTH_TOKEN=your_auth_token
-TWILIO_PHONE_NUMBER=+1234567890
-TEST_MODE=true
-```
+### Access Points
+- **Frontend UI**: http://localhost:5173
+- **Backend API**: http://localhost:8000
+- **API Documentation**: http://localhost:8000/docs
+- **Database**: localhost:5432
 
-### 📱 Join Protego Sandbox (Twilio Test Mode)
+## 🎯 Usage
 
-Since the deployed instance runs in **Twilio Test Mode**, to receive SMS/WhatsApp alerts you need to be added to the sandbox:
+### Getting Started
 
-**Message to join:**
-```
-Send a message to: +1 (Protego Twilio Number)
-Message: "join stretch-particular"
-```
+1. **Sign Up**
+   - Open http://localhost:5173
+   - Click "Sign Up" tab
+   - Fill in:
+     - Full Name
+     - Phone Number (select country code from dropdown)
+     - Email Address
+     - Password (minimum 8 characters)
+   - Add trusted emergency contacts:
+     - Select country code
+     - Enter phone number
+     - Click "+" to add (can add multiple)
+   - Click "Create Account"
+   - Automatically logged in with JWT token
 
-This will add your phone number to the approved list for receiving alerts. Once added, you'll receive real-time emergency notifications when alerts are triggered.
+2. **Sign In**
+   - Click "Sign In" tab
+   - Enter email and password
+   - Click "Sign In"
 
-### 4️⃣ Access Application
+3. **Start Walk Mode**
+   - From Dashboard, click "Start Walk Mode"
+   - Grant location permissions when prompted
+   - Walk session begins monitoring
+   - Safety score updates in real-time
 
-- **Frontend**: http://localhost:5173
-- **API Docs**: http://localhost:8000/docs
-- **ReDoc**: http://localhost:8000/redoc
+4. **Emergency Features**
+   - **SOS Button**: Tap the red SOS button for instant alert
+   - **Voice Activation**: Enable voice mode and say "help me"
+   - Both trigger immediate SMS to all trusted contacts with your location
 
-## 📁 Project Structure
+5. **Manage Trusted Contacts**
+   - Go to "Contacts" tab
+   - View all emergency contacts
+   - Add new contacts with country code selector
+   - Remove contacts by clicking the X button
 
-```
-Protego/
-├── backend/                    # FastAPI Server (Python 3.12)
-│   ├── main.py                # Entry point
-│   ├── models.py              # SQLAlchemy ORM models
-│   ├── schemas.py             # Pydantic schemas
-│   ├── database.py            # PostgreSQL config
-│   ├── config.py              # Settings
-│   ├── requirements.txt        # Python dependencies
-│   ├── routers/               # API endpoints
-│   │   ├── users.py
-│   │   ├── alerts.py
-│   │   ├── walk.py
-│   │   └── admin.py
-│   ├── services/              # Business logic
-│   │   ├── alert_manager.py
-│   │   └── twilio_service.py
-│   ├── tests/                 # Unit tests (pytest)
-│   ├── ml/                    # ML inference stub
-│   ├── Dockerfile
-│   └── pytest.ini
-│
-├── frontend/                   # React SPA (TypeScript)
-│   ├── src/
-│   │   ├── App.tsx            # Main component (single-page)
-│   │   ├── main.tsx           # Entry point
-│   │   ├── index.css          # Tailwind styles
-│   │   ├── store/
-│   │   │   └── useUserStore.ts     # Zustand state management
-│   │   ├── services/
-│   │   │   └── api.ts              # Axios API client
-│   │   └── constants/
-│   │       └── alertTypes.ts       # Alert type enums
-│   ├── package.json
-│   ├── vite.config.js         # Vite with API proxy
-│   ├── tsconfig.json          # TypeScript config
-│   ├── tailwind.config.js
-│   ├── Dockerfile
-│   └── index.html
-│
-├── ml/                        # ML Inference Module
-│   ├── inference.py
-│   └── README.md
-│
-├── docker-compose.yml         # Compose orchestration
-├── setup_db.sh               # Database setup
-├── runner.py                 # Development runner (automated)
-├── SETUP.md                  # Detailed setup
-└── README.md                 # This file
-```
+6. **Location Tracking**
+   - Go to "Tracking" tab
+   - Start live tracking for continuous location updates
+   - View current coordinates and accuracy
 
-## 🔄 API Endpoints
+## 🔧 Development
 
-### Users
-- `POST /api/users/register` - Create new user
-- `POST /api/users/login` - User login
-- `GET /api/users/{user_id}` - Get profile
+### Backend Development
 
-### Walk Sessions
-- `POST /api/walks/start` - Start safety session
-- `POST /api/walks/stop` - Stop safety session
-- `GET /api/walks/active/{user_id}` - Get active session
-
-### Alerts
-- `POST /api/alerts/` - Create standard alert
-- `POST /api/alerts/instant` - Create instant emergency alert
-- `GET /api/alerts/{alert_id}` - Get alert details
-- `POST /api/alerts/{alert_id}/cancel` - Cancel alert
-
-## 🎯 Frontend Features
-
-### Dashboard (Main View)
-- Safety score & risk assessment
-- Walk mode toggle (start/stop)
-- Voice activation on/off
-- Real-time alerts feed
-- SOS emergency button (pulsing)
-- Trusted contacts count
-
-### Tracking Page
-- Live GPS coordinates
-- Accuracy metrics (±X meters)
-- Real-time location updates
-- Start/stop live tracking
-
-### Contacts Page
-- Emergency contact list
-- Contact details display
-- Quick phone numbers
-
-### Safety Page
-- Security & privacy info
-- End-to-end encryption details
-- Location privacy controls
-- Safety tips & best practices
-
-## 🔐 Security Features
-
-- ✅ End-to-end encrypted location data
-- ✅ Role-based access control
-- ✅ JWT authentication (production-ready)
-- ✅ HTTPS support
-- ✅ SQL injection prevention (SQLAlchemy ORM)
-- ✅ CORS properly configured
-- ✅ Input validation on all endpoints
-
-## 📱 Device Support
-
-- ✅ Desktop browsers (Chrome, Firefox, Safari, Edge)
-- ✅ Mobile browsers (iOS Safari, Chrome Mobile)
-- ✅ Responsive Tailwind design
-- ✅ Touch-optimized UI
-
-## 🧪 Testing
-
-**Backend Tests:**
 ```bash
 cd backend
-pytest tests/
-pytest tests/test_alerts.py -v
-pytest tests/test_users.py -v
-```
 
-**Coverage:**
-```bash
+# Create virtual environment
+python -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+
+# Install dependencies
+pip install -r requirements.txt
+
+# Run locally
+uvicorn main:app --reload
+
+# Run tests
+pytest
 pytest --cov=. --cov-report=html
 ```
 
-## 🐳 Docker Deployment
+### Frontend Development
 
 ```bash
-# Build and start with Docker Compose
-docker-compose up --build
+cd frontend
 
-# Access:
-# - Frontend: http://localhost:5173
-# - Backend: http://localhost:8000/docs
-# - Database: localhost:5432
+# Install dependencies
+npm install
+
+# Run dev server
+npm run dev
+
+# Run tests
+npm test
+
+# Build for production
+npm run build
 ```
+
+### API Documentation
+
+FastAPI automatically generates interactive API documentation:
+
+- **Swagger UI**: http://localhost:8000/docs
+- **ReDoc**: http://localhost:8000/redoc
 
 ## 📊 Database Schema
 
-Automatically created by SQLAlchemy:
-
 ```sql
-users
-├── id (primary key)
-├── email (unique)
-├── password
+Users
+├── id (PK)
 ├── name
-├── phone
+├── phone (unique)
+├── email (unique, not null)
+├── password_hash (bcrypt hashed)
+├── trusted_contacts (JSON array of phone numbers)
 ├── created_at
+└── updated_at
 
-walk_sessions
-├── id (primary key)
-├── user_id (foreign key)
+WalkSessions
+├── id (PK)
+├── user_id (FK)
 ├── start_time
 ├── end_time
-├── status
+├── active (boolean)
+├── location_lat
+└── location_lng
 
-alerts
-├── id (primary key)
-├── user_id (foreign key)
-├── session_id (foreign key)
-├── type (enum: SCREAM, FALL, DISTRESS, etc.)
-├── confidence (0.0-1.0)
-├── status
+Alerts
+├── id (PK)
+├── user_id (FK)
+├── session_id (FK)
+├── type (enum: SCREAM, FALL, SOS, VOICE_ACTIVATION, etc.)
+├── confidence (0.0 to 1.0)
+├── status (enum: PENDING, TRIGGERED, CANCELLED, SAFE)
 ├── location_lat
 ├── location_lng
+├── snapshot_url
 ├── created_at
+├── triggered_at
+└── cancelled_at
 ```
 
-## 🔄 Alert Type Enum
+## 🧪 Testing
 
-```typescript
-SCREAM: 'SCREAM'
-FALL: 'FALL'
-DISTRESS: 'DISTRESS'
-PANIC: 'PANIC'
-MOTION_ANOMALY: 'MOTION_ANOMALY'
-SOUND_ANOMALY: 'SOUND_ANOMALY'
-VOICE_ACTIVATION: 'VOICE_ACTIVATION'
-```
+### Backend Tests
 
-## 🛠️ Troubleshooting
-
-### PostgreSQL Connection Error
-```bash
-# Check if PostgreSQL is running
-sudo systemctl status postgresql
-
-# Start PostgreSQL
-sudo systemctl start postgresql
-
-# Test connection
-psql -U protego_user -d protego_db
-```
-
-### Frontend Module Errors
-```bash
-cd frontend
-rm -rf node_modules package-lock.json
-npm install
-npm run dev
-```
-
-### Backend Dependencies
 ```bash
 cd backend
-source .venv/bin/activate
-pip install --upgrade pip
-pip install -r requirements.txt --force-reinstall
+pytest -v
+pytest tests/test_users.py -v
+pytest tests/test_alerts.py -v
 ```
 
-### Port Already in Use
-```bash
-# Kill process on port 8000
-lsof -ti:8000 | xargs kill -9
-
-# Kill process on port 5173
-lsof -ti:5173 | xargs kill -9
-```
-
-## 📈 Performance
-
-- **Frontend Build**: ~2s (Vite)
-- **Bundle Size**: 265KB uncompressed, 85KB gzipped
-- **API Response**: <100ms average
-- **Database**: Indexed queries for fast lookups
-
-## 🚀 Production Deployment
-
-### Deploy to VPS (Recommended)
-
-For complete VPS deployment guide, see **[DEPLOYMENT.md](./DEPLOYMENT.md)**
-
-**Quick Deploy (3 steps):**
+### Frontend Tests
 
 ```bash
-# 1. SSH to your VPS
-ssh root@your_vps_ip
-
-# 2. Clone and run deployment script
-git clone https://github.com/YOUR_USERNAME/Protego.git
-cd Protego
-bash deploy.sh your-domain.com secure_db_password
-
-# 3. Update Twilio credentials
-nano /opt/protego/.env
-# Update TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_FROM
-docker-compose restart backend
-```
-
-**What Gets Set Up:**
-- ✅ Docker & Docker Compose
-- ✅ Nginx reverse proxy
-- ✅ SSL certificate (Let's Encrypt)
-- ✅ PostgreSQL database
-- ✅ FastAPI backend
-- ✅ React frontend
-- ✅ Automated backups
-- ✅ Health monitoring
-
-### Deployment Resources
-
-- **[DEPLOYMENT.md](./DEPLOYMENT.md)** - Complete VPS deployment guide (Nginx, SSL, Backups, Monitoring)
-- **[VPS_QUICK_REFERENCE.md](./VPS_QUICK_REFERENCE.md)** - Quick command reference for common tasks
-- **[ENV_PRODUCTION_GUIDE.md](./ENV_PRODUCTION_GUIDE.md)** - Environment variables setup & best practices
-
-### Alternative Deployment Options
-
-#### Option 1: Docker Compose (Development/Small Production)
-```bash
-docker-compose up -d
-# Access: http://localhost:5173 (frontend)
-#         http://localhost:8000 (API)
-```
-
-#### Option 2: Traditional Gunicorn + Nginx
-```bash
-cd backend
-pip install gunicorn
-gunicorn -w 4 -b 0.0.0.0:8000 --access-logfile - main:app
-```
-
-#### Option 3: Cloud Platforms
-
-**Vercel (Frontend):**
-```bash
-npm i -g vercel
 cd frontend
-vercel --prod
+npm test
+npm test -- --coverage
 ```
 
-**Railway/Render/Heroku (Backend):**
-- Use Gunicorn in `Procfile`
-- Set environment variables in dashboard
-- Configure PostgreSQL as add-on
-
-### Environment Variables (Production)
-
-See **[ENV_PRODUCTION_GUIDE.md](./ENV_PRODUCTION_GUIDE.md)** for detailed setup.
-
-```env
-# Backend (required)
-DATABASE_URL=postgresql://protego_user:secure_password@db:5432/protego
-TWILIO_ACCOUNT_SID=your_actual_sid
-TWILIO_AUTH_TOKEN=your_actual_token
-TWILIO_FROM=+1234567890
-SECRET_KEY=generate_with_openssl_rand_-base64_32
-ALGORITHM=HS256
-
-# Security
-TEST_MODE=false
-ALLOWED_ORIGINS=https://your-domain.com,https://www.your-domain.com
-ENVIRONMENT=production
-
-# Alert Configuration
-ALERT_CONFIDENCE_THRESHOLD=0.8
-ALERT_COUNTDOWN_SECONDS=5
-```
+## 🚀 Deployment
 
 ### Production Checklist
 
-- [ ] DNS records pointing to VPS IP
-- [ ] SSL certificate installed and auto-renewal enabled
-- [ ] Database password changed from default
-- [ ] SECRET_KEY generated with strong random value
-- [ ] Twilio credentials configured (not in test mode)
-- [ ] ALLOWED_ORIGINS updated with your domain
-- [ ] CORS properly configured
-- [ ] Backups automated
-- [ ] Firewall rules configured (80, 443, 22 only)
-- [ ] Health checks configured
-- [ ] Monitoring/logging setup
-- [ ] Emergency contacts verified
+- [ ] Set `TEST_MODE=false` in backend/.env
+- [ ] Configure real Twilio credentials
+- [ ] Update `ALLOWED_ORIGINS` for production domain
+- [ ] Set strong `SECRET_KEY` (32+ characters)
+- [ ] Use production PostgreSQL database
+- [ ] Enable HTTPS/SSL
+- [ ] Configure firewall rules
+- [ ] Set up monitoring and logging
+- [ ] Implement rate limiting
+- [ ] Replace ML stub with trained model
 
-## 📝 License
+### Environment Variables
 
-MIT License - see LICENSE file
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `DATABASE_URL` | PostgreSQL connection string | `postgresql://protego_user:protego_pass@db:5432/protego` |
+| `TWILIO_ACCOUNT_SID` | Twilio account SID | Required |
+| `TWILIO_AUTH_TOKEN` | Twilio auth token | Required |
+| `TWILIO_FROM` | Twilio phone number | Required |
+| `TEST_MODE` | Enable test mode (no SMS sent) | `true` |
+| `ALERT_CONFIDENCE_THRESHOLD` | Minimum confidence for alerts | `0.8` |
+| `ALERT_COUNTDOWN_SECONDS` | Countdown duration | `5` |
+| `SECRET_KEY` | JWT secret key | Change in production |
 
-## 👨‍💻 Author
+## 🤖 ML Integration
 
-**Anay0305** - Full Stack Developer
+The current implementation includes an ML inference stub. To integrate a real model:
+
+1. Train your distress detection model (TensorFlow/PyTorch)
+2. Export model to `ml/models/`
+3. Update `ml/inference.py` to load and use your model
+4. See [ml/README.md](ml/README.md) for detailed instructions
+
+## 🔒 Security Features
+
+✅ **JWT Authentication**: Secure token-based auth with 7-day expiration
+✅ **Password Hashing**: Bcrypt with 12 rounds for password security
+✅ **Protected Routes**: All user endpoints require valid JWT token
+✅ **Input Validation**: Pydantic schemas validate all inputs
+✅ **SQL Injection Protection**: SQLAlchemy ORM prevents injection attacks
+✅ **CORS Configuration**: Environment-based origin whitelisting
+✅ **Phone Validation**: E.164 format enforcement (+country code)
+✅ **HTTPS Ready**: Enable SSL/TLS for production deployment
+✅ **Secrets Management**: All credentials via environment variables
+✅ **XSS Protection**: React automatic escaping prevents XSS attacks
+
+## 📝 API Endpoints
+
+### Authentication
+- `POST /api/users/signup` - Register new user with trusted contacts
+- `POST /api/users/signin` - Login and receive JWT token
+- `GET /api/users/me` - Get current user profile (requires JWT)
+
+### User Management
+- `PUT /api/users/me` - Update current user profile (requires JWT)
+
+### Trusted Contacts
+- `GET /api/users/me/trusted-contacts` - List trusted contacts (requires JWT)
+- `POST /api/users/me/trusted-contacts` - Add trusted contact (requires JWT)
+- `DELETE /api/users/me/trusted-contacts` - Remove trusted contact (requires JWT)
+
+### Walk Sessions
+- `POST /api/walk/start` - Start walk session
+- `POST /api/walk/stop` - Stop walk session
+- `GET /api/walk/active/{user_id}` - Get active session
+
+### Alerts
+- `POST /api/alerts/` - Create alert
+- `POST /api/alerts/instant` - Create instant alert (SOS/Voice)
+- `POST /api/alerts/{id}/cancel` - Cancel pending alert
+- `GET /api/alerts/{id}` - Get alert details
+
+### Admin
+- `GET /api/admin/alerts` - List all alerts
+- `GET /api/admin/stats` - System statistics
+
+## 🤝 Contributing
+
+1. Fork the repository
+2. Create feature branch (`git checkout -b feature/AmazingFeature`)
+3. Commit changes (`git commit -m 'Add AmazingFeature'`)
+4. Push to branch (`git push origin feature/AmazingFeature`)
+5. Open Pull Request
+
+## 📄 License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## 🙏 Acknowledgments
+
+- FastAPI framework for excellent async API support
+- Twilio for reliable messaging infrastructure
+- React and Vite for modern frontend development
+- Tailwind CSS for beautiful, responsive UI
 
 ## 📞 Support
 
-For issues, open a GitHub Issue.
+For issues and questions:
+- Open an issue on GitHub
+- Email: support@protego.example.com
+- Documentation: http://localhost:8000/docs
+
+## 🗺️ Roadmap
+
+- [ ] Mobile app (React Native)
+- [ ] Real-time WebSocket updates
+- [ ] Voice calls in addition to SMS
+- [ ] Geofencing and route tracking
+- [ ] Integration with wearable devices
+- [ ] Multi-language support
+- [ ] Advanced ML models for better detection
+- [ ] Video recording capability
+- [ ] Emergency services integration
 
 ---
 
-**Made with ❤️ for personal safety**
+**Built with ❤️ for personal safety**

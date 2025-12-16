@@ -3,12 +3,10 @@ Database setup and session management.
 Provides SQLAlchemy engine, session maker, and base model class.
 """
 
-from sqlalchemy import create_engine, text
+from sqlalchemy import create_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, Session
 from typing import Generator
-import psycopg2
-from psycopg2 import sql
 
 from config import settings
 
@@ -50,21 +48,3 @@ def init_db() -> None:
     """
     from models import User, WalkSession, Alert  # Import models to register them
     Base.metadata.create_all(bind=engine)
-    
-    # Add SOS to AlertType enum if it doesn't exist
-    try:
-        with engine.begin() as conn:
-            conn.execute(text("ALTER TYPE alerttype ADD VALUE 'SOS'"))
-    except Exception as e:
-        # Type already exists or error occurred, continue silently
-        pass
-    
-    # Add emergency_contact_number column if it doesn't exist
-    try:
-        with engine.begin() as conn:
-            conn.execute(text(
-                "ALTER TABLE users ADD COLUMN emergency_contact_number VARCHAR NOT NULL DEFAULT '+1234567890'"
-            ))
-    except Exception as e:
-        # Column already exists or error occurred, continue silently
-        pass

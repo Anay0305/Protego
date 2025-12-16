@@ -9,7 +9,6 @@ import sys
 import subprocess
 import time
 import signal
-import shutil
 from pathlib import Path
 
 # Colors for terminal output
@@ -101,82 +100,45 @@ def check_postgresql():
         return False
 
 def setup_backend():
+    """Set up backend virtual environment and dependencies."""
     print_header("Setting Up Backend")
 
-    # Check for existing .venv first (Python 3.12), then fallback to venv
-    venv_path = BACKEND_DIR / ".venv"
+    venv_path = BACKEND_DIR / "venv"
+
+    # Check if virtual environment exists
     if not venv_path.exists():
-        venv_path = BACKEND_DIR / "venv"
-
-    # Determine pip path to check if venv is valid
-    if os.name == 'nt':
-        pip_check_path = venv_path / "Scripts" / "pip.exe"
-    else:
-        pip_check_path = venv_path / "bin" / "pip"
-
-    # Check if venv exists AND is valid (has pip)
-    venv_is_valid = venv_path.exists() and pip_check_path.exists()
-
-    if not venv_is_valid:
-        if venv_path.exists():
-            print_warning(f"Virtual environment '{venv_path.name}' is corrupted (missing pip)")
-            print_info("Removing corrupted virtual environment...")
-            shutil.rmtree(venv_path)
-        # Create .venv with Python 3.12 if available
         print_info("Creating virtual environment...")
-        preferred_python = os.environ.get("PROTEGO_PYTHON") or shutil.which("python3.12") or sys.executable
-        venv_path = BACKEND_DIR / ".venv"
-        subprocess.run([preferred_python, '-m', 'venv', str(venv_path)], check=True)
+        subprocess.run([sys.executable, '-m', 'venv', str(venv_path)], check=True)
         print_success("Virtual environment created")
     else:
-        venv_name = venv_path.name
-        print_info(f"Virtual environment '{venv_name}' already exists")
+        print_info("Virtual environment already exists")
 
-    if os.name == 'nt':
+    # Determine pip path based on OS
+    if os.name == 'nt':  # Windows
         pip_path = venv_path / "Scripts" / "pip"
         python_path = venv_path / "Scripts" / "python"
-    else:
+    else:  # Unix/Linux/Mac
         pip_path = venv_path / "bin" / "pip"
         python_path = venv_path / "bin" / "python"
 
+    # Install dependencies
     requirements_file = BACKEND_DIR / "requirements.txt"
     if requirements_file.exists():
         print_info("Installing Python dependencies...")
+        # Set PATH to include /usr/bin for pg_config
         install_env = os.environ.copy()
-        # Add PostgreSQL bin directory to PATH for pg_config
-        pg_paths = [
-            "/usr/bin",
-            "/usr/pgsql-*/bin",  # Common on Fedora/RHEL
-            "/usr/lib/postgresql/*/bin",  # Common on Debian/Ubuntu
-        ]
-        install_env['PATH'] = f"{':'.join(pg_paths)}:{install_env.get('PATH', '')}"
-        try:
-            subprocess.run([str(pip_path), 'install', '-r', str(requirements_file)], check=True, env=install_env)
-            print_success("Python dependencies installed")
-        except subprocess.CalledProcessError:
-            print_error("Failed to install dependencies. Trying with system pg_config...")
-            # Try to find pg_config
-            try:
-                pg_config_result = subprocess.run(['which', 'pg_config'], capture_output=True, text=True)
-                if pg_config_result.returncode == 0:
-                    pg_bin_dir = os.path.dirname(pg_config_result.stdout.strip())
-                    install_env['PATH'] = f"{pg_bin_dir}:{install_env.get('PATH', '')}"
-                    subprocess.run([str(pip_path), 'install', '-r', str(requirements_file)], check=True, env=install_env)
-                    print_success("Python dependencies installed")
-                else:
-                    raise subprocess.CalledProcessError(1, "pg_config not found")
-            except subprocess.CalledProcessError:
-                print_error("Failed to install psycopg2-binary. You may need to install postgresql-devel:")
-                print_info("  sudo dnf install postgresql-devel  # Fedora/RHEL")
-                print_info("  sudo apt install libpq-dev         # Debian/Ubuntu")
-                raise
+        install_env['PATH'] = f"/usr/bin:{install_env.get('PATH', '')}"
+        subprocess.run([str(pip_path), 'install', '-r', str(requirements_file)], check=True, env=install_env)
+        print_success("Python dependencies installed")
 
+    # Check for .env file
     env_file = BACKEND_DIR / ".env"
     env_example = BACKEND_DIR / ".env.example"
 
     if not env_file.exists() and env_example.exists():
         print_warning(".env file not found")
         print_info("Copying .env.example to .env")
+        import shutil
         shutil.copy(env_example, env_file)
         print_success(".env file created")
         print_warning("Please edit backend/.env with your configuration!")

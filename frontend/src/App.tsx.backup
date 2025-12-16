@@ -1,10 +1,15 @@
 import { useState, useEffect, useRef } from 'react';
-import { Shield, LogOut, Bell, AlertTriangle, Activity, Navigation, CheckCircle, Mic, MicOff, Map } from 'lucide-react';
-import AuthPage from './components/AuthPage';
-import TrustedContactsPage from './components/TrustedContactsPage';
-import { userAPI, walkAPI, alertAPI, User } from './services/api';
+import { Shield, Phone, Users, Bell, Lock, AlertTriangle, Map, Activity, Eye, EyeOff, LogOut, Mic, MicOff, CheckCircle, Navigation } from 'lucide-react';
 import { useUserStore } from './store/useUserStore';
+import { walkAPI, alertAPI } from './services/api';
 import { ALERT_TYPES } from './constants/alertTypes';
+
+interface User {
+  id: number;
+  name: string;
+  email: string;
+  phone: string;
+}
 
 interface Location {
   lat: number;
@@ -20,17 +25,25 @@ interface Alert {
   timestamp: string;
 }
 
-const ProtegoApp = () => {
+interface TrustedContact {
+  id: number;
+  name: string;
+  phone: string;
+  email: string;
+}
+
+const ProteoApp = () => {
   const userStore = useUserStore();
+  const user = userStore.user as unknown as User | null;
   const { isWalking, activeSession, startSession, stopSession } = userStore;
 
-  const [user, setUser] = useState<User | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [currentView, setCurrentView] = useState('dashboard');
   const [location, setLocation] = useState<Location | null>(null);
   const [safetyScore, setSafetyScore] = useState(85);
   const [alerts, setAlerts] = useState<Alert[]>([]);
   const [isTracking, setIsTracking] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   const [sosActive, setSosActive] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -38,32 +51,45 @@ const ProtegoApp = () => {
   const [isListening, setIsListening] = useState(false);
   const [voiceLogs, setVoiceLogs] = useState<Array<{ timestamp: string; message: string; type: string }>>([]);
   const [walkingStatus, setWalkingStatus] = useState('safe');
+  const [trustedContacts, setTrustedContacts] = useState<TrustedContact[]>([
+    { id: 1, name: 'Emergency', phone: '+919056690327', email: 'emergency@protego.com' }
+  ]);
+
+  const [authForm, setAuthForm] = useState({
+    email: '',
+    password: '',
+    name: '',
+    phone: '',
+    emergency_contact_number: '',
+    otp: '',
+    mode: 'login'
+  });
 
   const recognitionRef = useRef<any>(null);
   const watchIdRef = useRef<number | null>(null);
   const lastAlertTimeRef = useRef(0);
   const alertCooldownMs = 30000;
 
-  // Check for existing auth token on mount
-  useEffect(() => {
-    const checkAuth = async () => {
-      const token = localStorage.getItem('access_token');
-      if (token) {
-        try {
-          const response = await userAPI.getProfile();
-          setUser(response.data);
-          userStore.setUser(response.data as any);
-          setIsAuthenticated(true);
-        } catch (err) {
-          localStorage.removeItem('access_token');
-        }
-      }
+  // Add voice log
+  const addVoiceLog = (message: string, type: string = 'info') => {
+    const timestamp = new Date().toLocaleTimeString();
+    const logEntry = { timestamp, message, type };
+    console.log(`[Voice ${type.toUpperCase()}] ${timestamp}: ${message}`);
+    setVoiceLogs(prev => [...prev, logEntry].slice(-10));
+  };
+
+  // Add alert
+  const addAlert = (type: string, message: string) => {
+    const newAlert = {
+      id: Date.now(),
+      type,
+      message,
+      timestamp: new Date().toLocaleTimeString()
     };
+    setAlerts(prev => [newAlert, ...prev].slice(0, 5));
+  };
 
-    checkAuth();
-  }, []);
-
-  // Initialize location
+  // Get user's location
   useEffect(() => {
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
@@ -82,6 +108,14 @@ const ProtegoApp = () => {
       );
     }
   }, []);
+
+  // Initialize authentication
+  useEffect(() => {
+    if (user) {
+      setIsAuthenticated(true);
+      setCurrentView('dashboard');
+    }
+  }, [user]);
 
   // Initialize voice recognition
   useEffect(() => {
@@ -103,7 +137,7 @@ const ProtegoApp = () => {
 
     recognition.onstart = () => {
       setIsListening(true);
-      addVoiceLog('Listening started - say "help me" to trigger alert', 'success');
+      addVoiceLog('🎤 Listening started - say "help me" to trigger alert', 'success');
     };
 
     recognition.onend = () => {
@@ -138,11 +172,11 @@ const ProtegoApp = () => {
 
         if (timeSinceLastAlert < alertCooldownMs) {
           const remainingSeconds = Math.ceil((alertCooldownMs - timeSinceLastAlert) / 1000);
-          addVoiceLog(`Alert cooldown active (${remainingSeconds}s remaining)`, 'warning');
+          addVoiceLog(`⏳ Alert cooldown active (${remainingSeconds}s remaining)`, 'warning');
           return;
         }
 
-        addVoiceLog('"HELP ME" DETECTED! Triggering emergency alert...', 'warning');
+        addVoiceLog('🛡️ "HELP ME" DETECTED! Triggering emergency alert...', 'warning');
         lastAlertTimeRef.current = now;
         handleVoiceAlert();
       }
@@ -215,7 +249,7 @@ const ProtegoApp = () => {
     const hour = new Date().getHours();
     const isNightTime = hour < 6 || hour > 20;
     const randomFactor = Math.random();
-
+    
     if (randomFactor > 0.95) {
       setWalkingStatus('alert');
       setSafetyScore(45);
@@ -229,27 +263,11 @@ const ProtegoApp = () => {
     }
   };
 
-  const addVoiceLog = (message: string, type: string = 'info') => {
-    const timestamp = new Date().toLocaleTimeString();
-    const logEntry = { timestamp, message, type };
-    console.log(`[Voice ${type.toUpperCase()}] ${timestamp}: ${message}`);
-    setVoiceLogs(prev => [...prev, logEntry].slice(-10));
-  };
-
-  const addAlert = (type: string, message: string) => {
-    const newAlert = {
-      id: Date.now(),
-      type,
-      message,
-      timestamp: new Date().toLocaleTimeString()
-    };
-    setAlerts(prev => [newAlert, ...prev].slice(0, 5));
-  };
-
+  // SOS Emergency
   const triggerSOS = async () => {
     setSosActive(true);
     addAlert('emergency', 'SOS ACTIVATED - Emergency contacts notified!');
-
+    
     let currentLocation = location;
     if (navigator.geolocation) {
       try {
@@ -269,7 +287,7 @@ const ProtegoApp = () => {
     }
 
     try {
-      await alertAPI.createInstantAlert({
+      const alert = await alertAPI.createInstantAlert({
         user_id: user?.id || 1,
         session_id: activeSession?.id || null,
         type: ALERT_TYPES.SOS,
@@ -292,6 +310,7 @@ const ProtegoApp = () => {
     addAlert('success', 'SOS cancelled');
   };
 
+  // Voice alert
   const handleVoiceAlert = async () => {
     addVoiceLog('Creating INSTANT emergency alert...', 'warning');
 
@@ -324,7 +343,7 @@ const ProtegoApp = () => {
         location_lng: currentLocation?.lng || null,
       });
 
-      addVoiceLog(`EMERGENCY ALERT SENT! ID: ${alert.data.id}`, 'success');
+      addVoiceLog(`✅ EMERGENCY ALERT SENT! ID: ${alert.data.id}`, 'success');
       setError(null);
     } catch (err: any) {
       const errorMsg = `Failed to send emergency alert: ${err.response?.data?.detail || err.message}`;
@@ -333,6 +352,7 @@ const ProtegoApp = () => {
     }
   };
 
+  // Walk control
   const handleStartWalk = async () => {
     setLoading(true);
     setError(null);
@@ -370,19 +390,19 @@ const ProtegoApp = () => {
     }
   };
 
-  const handleAuthSuccess = (token: string, userData: User) => {
-    setUser(userData);
-    userStore.setUser(userData as any);
-    setIsAuthenticated(true);
-    addAlert('success', 'Successfully logged in');
+  const handleAuth = () => {
+    if (authForm.email && authForm.password && authForm.emergency_contact_number) {
+      setIsAuthenticated(true);
+      setCurrentView('dashboard');
+      addAlert('success', 'Successfully logged in');
+    } else {
+      addAlert('error', 'Please fill in all fields including emergency contact');
+    }
   };
 
   const handleLogout = () => {
-    localStorage.removeItem('access_token');
-    setUser(null);
-    userStore.clearUser();
     setIsAuthenticated(false);
-    setCurrentView('dashboard');
+    setCurrentView('login');
     stopTracking();
     if (recognitionRef.current) {
       recognitionRef.current.stop();
@@ -395,44 +415,121 @@ const ProtegoApp = () => {
     addVoiceLog(`Voice activation ${newState ? 'ENABLED' : 'DISABLED'}`, newState ? 'success' : 'info');
   };
 
+  // Login View
   if (!isAuthenticated) {
-    return <AuthPage onSuccess={handleAuthSuccess} />;
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
+        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-8">
+          <div className="text-center mb-8">
+            <div className="bg-indigo-600 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
+              <Shield className="text-white" size={32} />
+            </div>
+            <h1 className="text-3xl font-bold text-gray-800">Protego</h1>
+            <p className="text-gray-600 mt-2">Personal Safety Companion</p>
+          </div>
+
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Email Address
+              </label>
+              <input
+                type="email"
+                value={authForm.email}
+                onChange={(e) => setAuthForm({...authForm, email: e.target.value})}
+                onKeyPress={(e) => e.key === 'Enter' && handleAuth()}
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                placeholder="your@email.com"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Password
+              </label>
+              <div className="relative">
+                <input
+                  type={showPassword ? "text" : "password"}
+                  value={authForm.password}
+                  onChange={(e) => setAuthForm({...authForm, password: e.target.value})}
+                  onKeyPress={(e) => e.key === 'Enter' && handleAuth()}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent pr-12"
+                  placeholder="••••••••"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500"
+                >
+                  {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                </button>
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Emergency Contact Number
+              </label>
+              <input
+                type="tel"
+                value={authForm.emergency_contact_number}
+                onChange={(e) => setAuthForm({...authForm, emergency_contact_number: e.target.value})}
+                onKeyPress={(e) => e.key === 'Enter' && handleAuth()}
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                placeholder="+1234567890"
+              />
+              <p className="text-xs text-gray-500 mt-1">In case of emergency, we'll contact this number</p>
+            </div>
+
+            <button
+              onClick={handleAuth}
+              className="w-full bg-indigo-600 text-white py-3 rounded-lg font-semibold hover:bg-indigo-700 transition duration-200"
+            >
+              Secure Login
+            </button>
+
+            <div className="text-center text-sm text-gray-600 mt-4">
+              <p>🔒 Protected with Encryption</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
   }
 
+  // Main Dashboard
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
+    <div className="min-h-screen bg-gray-50">
       {/* Header */}
-      <header className="bg-white shadow-md border-b border-gray-200">
+      <header className="bg-white shadow-sm border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
           <div className="flex items-center space-x-3">
-            <div className="bg-gradient-to-br from-indigo-600 to-purple-600 p-2 rounded-xl">
-              <Shield className="text-white" size={28} />
-            </div>
+            <Shield className="text-indigo-600" size={32} />
             <div>
               <h1 className="text-xl font-bold text-gray-800">Protego</h1>
-              <p className="text-xs text-gray-500">Welcome, {user?.name}</p>
+              <p className="text-xs text-gray-500">Personal Safety System</p>
             </div>
           </div>
           <button
             onClick={handleLogout}
-            className="flex items-center space-x-2 px-4 py-2 text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-lg transition"
+            className="flex items-center space-x-2 text-gray-600 hover:text-gray-800"
           >
             <LogOut size={20} />
-            <span className="hidden sm:inline">Logout</span>
+            <span>Logout</span>
           </button>
         </div>
       </header>
 
       <div className="max-w-7xl mx-auto p-4">
         {/* Navigation */}
-        <div className="bg-white rounded-2xl shadow-sm p-2 mb-6 flex space-x-2 overflow-x-auto">
+        <div className="bg-white rounded-xl shadow-sm p-2 mb-6 flex space-x-2 overflow-x-auto">
           {['dashboard', 'tracking', 'contacts', 'safety'].map((view) => (
             <button
               key={view}
               onClick={() => setCurrentView(view)}
-              className={`px-4 py-3 rounded-xl font-medium whitespace-nowrap transition ${
+              className={`px-4 py-2 rounded-lg font-medium whitespace-nowrap transition ${
                 currentView === view
-                  ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-lg'
+                  ? 'bg-indigo-600 text-white'
                   : 'text-gray-600 hover:bg-gray-100'
               }`}
             >
@@ -446,20 +543,20 @@ const ProtegoApp = () => {
           {!sosActive ? (
             <button
               onClick={triggerSOS}
-              className="w-full bg-gradient-to-r from-red-600 to-red-700 text-white py-6 rounded-2xl font-bold text-2xl shadow-2xl hover:from-red-700 hover:to-red-800 transition duration-200 flex items-center justify-center space-x-3 transform hover:scale-105"
+              className="w-full bg-red-600 text-white py-6 rounded-2xl font-bold text-2xl shadow-lg hover:bg-red-700 transition duration-200 flex items-center justify-center space-x-3"
             >
               <AlertTriangle size={32} />
               <span>SOS EMERGENCY</span>
             </button>
           ) : (
-            <div className="bg-gradient-to-r from-red-600 to-red-700 text-white p-6 rounded-2xl animate-pulse shadow-2xl">
+            <div className="bg-red-600 text-white p-6 rounded-2xl animate-pulse">
               <div className="text-center">
-                <AlertTriangle size={48} className="mx-auto mb-3 animate-bounce" />
+                <AlertTriangle size={48} className="mx-auto mb-3" />
                 <h3 className="text-2xl font-bold mb-2">EMERGENCY ACTIVE</h3>
                 <p className="mb-4">Help is on the way. Stay safe!</p>
                 <button
                   onClick={cancelSOS}
-                  className="bg-white text-red-600 px-6 py-3 rounded-lg font-semibold hover:bg-gray-100 transition"
+                  className="bg-white text-red-600 px-6 py-3 rounded-lg font-semibold"
                 >
                   Cancel SOS
                 </button>
@@ -473,47 +570,47 @@ const ProtegoApp = () => {
           <div className="space-y-6">
             {/* Status Cards */}
             <div className="grid md:grid-cols-3 gap-4">
-              <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-2xl p-6 shadow-sm border border-green-200">
+              <div className="bg-white rounded-xl p-6 shadow-sm">
                 <div className="flex items-center justify-between mb-2">
                   <h3 className="font-semibold text-gray-700">Safety Score</h3>
                   <Activity className={`${
-                    safetyScore > 70 ? 'text-green-600' : safetyScore > 50 ? 'text-yellow-600' : 'text-red-600'
-                  }`} size={24} />
+                    safetyScore > 70 ? 'text-green-500' : safetyScore > 50 ? 'text-yellow-500' : 'text-red-500'
+                  }`} />
                 </div>
-                <p className="text-5xl font-bold text-gray-800">{safetyScore}</p>
-                <p className="text-sm text-gray-600 mt-1">
+                <p className="text-4xl font-bold text-gray-800">{safetyScore}</p>
+                <p className="text-sm text-gray-500 mt-1">
                   {walkingStatus === 'safe' ? 'Area is safe' : walkingStatus === 'caution' ? 'Stay alert' : 'High risk detected'}
                 </p>
               </div>
 
-              <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-2xl p-6 shadow-sm border border-blue-200">
+              <div className="bg-white rounded-xl p-6 shadow-sm">
                 <div className="flex items-center justify-between mb-2">
                   <h3 className="font-semibold text-gray-700">Walk Status</h3>
-                  <Navigation className={isWalking ? 'text-green-600' : 'text-gray-400'} size={24} />
+                  <Navigation className={isWalking ? 'text-green-500' : 'text-gray-400'} />
                 </div>
-                <p className="text-3xl font-bold text-gray-800">
+                <p className="text-2xl font-bold text-gray-800">
                   {isWalking ? 'Active' : 'Inactive'}
                 </p>
-                <p className="text-sm text-gray-600 mt-1">
+                <p className="text-sm text-gray-500 mt-1">
                   {isWalking ? 'Being monitored' : 'Start walk mode'}
                 </p>
               </div>
 
-              <div className="bg-gradient-to-br from-purple-50 to-purple-100 rounded-2xl p-6 shadow-sm border border-purple-200">
+              <div className="bg-white rounded-xl p-6 shadow-sm">
                 <div className="flex items-center justify-between mb-2">
                   <h3 className="font-semibold text-gray-700">Trusted Contacts</h3>
-                  <Shield className="text-purple-600" size={24} />
+                  <Users className="text-indigo-500" />
                 </div>
-                <p className="text-5xl font-bold text-gray-800">{user?.trusted_contacts?.length || 0}</p>
-                <p className="text-sm text-gray-600 mt-1">Ready to help</p>
+                <p className="text-4xl font-bold text-gray-800">{trustedContacts.length}</p>
+                <p className="text-sm text-gray-500 mt-1">Ready to help</p>
               </div>
             </div>
 
-            {/* Walk Control */}
-            <div className="bg-white rounded-2xl shadow-md p-8">
+            {/* Main Walk Control */}
+            <div className="bg-white rounded-xl shadow-sm p-6">
               <div className="flex flex-col items-center text-center">
                 <div
-                  className={`p-8 rounded-full mb-6 ${
+                  className={`p-6 rounded-full mb-6 ${
                     isWalking
                       ? 'bg-green-100 text-green-600'
                       : 'bg-gray-100 text-gray-600'
@@ -522,40 +619,36 @@ const ProtegoApp = () => {
                   <Shield className="w-24 h-24" />
                 </div>
 
-                <h2 className="text-3xl font-bold mb-2 text-gray-800">
+                <h2 className="text-2xl font-bold mb-2">
                   {isWalking ? 'Walk Mode Active' : 'Walk Mode Inactive'}
                 </h2>
 
-                <p className="text-gray-600 mb-6 text-lg">
+                <p className="text-gray-600 mb-6">
                   {isWalking
                     ? 'You are being monitored for safety.'
                     : 'Start Walk Mode to enable safety monitoring.'}
                 </p>
 
                 {isWalking && activeSession && (
-                  <div className="bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-xl p-5 mb-6 w-full max-w-md">
+                  <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-6 w-full">
                     <div className="flex items-center justify-center text-green-700 mb-2">
                       <CheckCircle className="w-5 h-5 mr-2" />
                       <span className="font-medium">Session Active</span>
                     </div>
-                    {location && (
-                      <p className="text-sm text-green-600">
-                        Location: {location.lat.toFixed(4)}, {location.lng.toFixed(4)}
-                      </p>
-                    )}
+                    <p className="text-sm text-green-600">
+                      Location: {location?.lat.toFixed(4)}, {location?.lng.toFixed(4)}
+                    </p>
                   </div>
                 )}
 
                 {/* Voice Control */}
                 {isWalking && (
-                  <div className="mb-6 w-full max-w-md">
+                  <div className="mb-4 w-full max-w-sm">
                     <button
                       onClick={toggleVoiceRecognition}
                       className={`${
-                        voiceEnabled
-                          ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white'
-                          : 'bg-gray-200 text-gray-600'
-                      } px-6 py-4 text-sm font-semibold w-full flex items-center justify-center gap-3 rounded-xl shadow-lg transition`}
+                        voiceEnabled ? 'bg-indigo-600 text-white' : 'bg-gray-200 text-gray-600'
+                      } px-6 py-3 text-sm font-semibold w-full flex items-center justify-center gap-2 rounded-lg`}
                     >
                       {voiceEnabled ? (
                         <>
@@ -575,8 +668,8 @@ const ProtegoApp = () => {
 
                 {/* Voice Logs */}
                 {voiceEnabled && voiceLogs.length > 0 && (
-                  <div className="mt-4 bg-gray-900 text-gray-100 rounded-xl p-4 max-h-64 overflow-y-auto w-full max-w-md">
-                    <div className="flex items-center justify-between mb-3">
+                  <div className="mt-4 bg-gray-900 text-gray-100 rounded-lg p-3 max-h-64 overflow-y-auto w-full">
+                    <div className="flex items-center justify-between mb-2">
                       <h4 className="text-xs font-semibold text-gray-300">Voice Logs</h4>
                       <button
                         onClick={() => setVoiceLogs([])}
@@ -593,6 +686,7 @@ const ProtegoApp = () => {
                             log.type === 'error' ? 'text-red-400' :
                             log.type === 'success' ? 'text-green-400' :
                             log.type === 'warning' ? 'text-yellow-400' :
+                            log.type === 'debug' ? 'text-gray-500' :
                             'text-gray-300'
                           }`}
                         >
@@ -608,10 +702,8 @@ const ProtegoApp = () => {
                   onClick={isWalking ? handleStopWalk : handleStartWalk}
                   disabled={loading}
                   className={`${
-                    isWalking
-                      ? 'bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800'
-                      : 'bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700'
-                  } text-white px-8 py-4 text-lg font-semibold w-full max-w-md rounded-xl transition shadow-lg transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none`}
+                    isWalking ? 'bg-red-600 hover:bg-red-700' : 'bg-green-600 hover:bg-green-700'
+                  } text-white px-8 py-4 text-lg font-semibold w-full max-w-sm rounded-lg transition`}
                 >
                   {loading
                     ? 'Please wait...'
@@ -623,19 +715,19 @@ const ProtegoApp = () => {
             </div>
 
             {/* Alerts */}
-            <div className="bg-white rounded-2xl shadow-md p-6">
-              <h3 className="font-semibold text-xl text-gray-800 mb-4 flex items-center">
-                <Bell className="mr-2 text-indigo-600" size={22} />
+            <div className="bg-white rounded-xl shadow-sm p-6">
+              <h3 className="font-semibold text-gray-800 mb-4 flex items-center">
+                <Bell className="mr-2" size={20} />
                 Recent Alerts
               </h3>
               <div className="space-y-2">
                 {alerts.length === 0 ? (
-                  <p className="text-gray-500 text-center py-4">No recent alerts</p>
+                  <p className="text-gray-500 text-sm">No recent alerts</p>
                 ) : (
                   alerts.map((alert) => (
                     <div
                       key={alert.id}
-                      className={`p-4 rounded-xl ${
+                      className={`p-3 rounded-lg ${
                         alert.type === 'emergency' ? 'bg-red-50 border-l-4 border-red-500' :
                         alert.type === 'warning' ? 'bg-yellow-50 border-l-4 border-yellow-500' :
                         alert.type === 'success' ? 'bg-green-50 border-l-4 border-green-500' :
@@ -657,24 +749,24 @@ const ProtegoApp = () => {
         {/* Tracking View */}
         {currentView === 'tracking' && (
           <div className="space-y-6">
-            <div className="bg-white rounded-2xl shadow-md p-6">
-              <h3 className="font-semibold text-2xl text-gray-800 mb-4 flex items-center">
-                <Map className="mr-2 text-indigo-600" size={28} />
+            <div className="bg-white rounded-xl shadow-sm p-6">
+              <h3 className="font-semibold text-xl text-gray-800 mb-4 flex items-center">
+                <Map className="mr-2" />
                 Live Tracking
               </h3>
-
+              
               <div className="mb-6">
                 {!isTracking ? (
                   <button
                     onClick={startTracking}
-                    className="w-full bg-gradient-to-r from-green-600 to-emerald-600 text-white py-4 rounded-xl font-semibold hover:from-green-700 hover:to-emerald-700 transition shadow-lg"
+                    className="w-full bg-green-600 text-white py-4 rounded-lg font-semibold hover:bg-green-700 transition"
                   >
                     Start Live Tracking
                   </button>
                 ) : (
                   <button
                     onClick={stopTracking}
-                    className="w-full bg-gradient-to-r from-red-600 to-red-700 text-white py-4 rounded-xl font-semibold hover:from-red-700 hover:to-red-800 transition shadow-lg"
+                    className="w-full bg-red-600 text-white py-4 rounded-lg font-semibold hover:bg-red-700 transition"
                   >
                     Stop Tracking
                   </button>
@@ -682,29 +774,13 @@ const ProtegoApp = () => {
               </div>
 
               {location && (
-                <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl p-6 border border-blue-200">
-                  <h4 className="font-semibold mb-4 text-gray-800 text-lg">Current Location</h4>
-                  <div className="space-y-3 text-sm">
-                    <div className="flex justify-between">
-                      <span className="font-medium text-gray-700">Latitude:</span>
-                      <span className="text-gray-800">{location.lat.toFixed(6)}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="font-medium text-gray-700">Longitude:</span>
-                      <span className="text-gray-800">{location.lng.toFixed(6)}</span>
-                    </div>
-                    {location.accuracy && (
-                      <div className="flex justify-between">
-                        <span className="font-medium text-gray-700">Accuracy:</span>
-                        <span className="text-gray-800">±{location.accuracy.toFixed(0)}m</span>
-                      </div>
-                    )}
-                    {location.timestamp && (
-                      <div className="flex justify-between">
-                        <span className="font-medium text-gray-700">Last Update:</span>
-                        <span className="text-gray-800">{new Date(location.timestamp).toLocaleString()}</span>
-                      </div>
-                    )}
+                <div className="bg-gray-50 rounded-lg p-4">
+                  <h4 className="font-semibold mb-3">Current Location</h4>
+                  <div className="space-y-2 text-sm">
+                    <p><span className="font-medium">Latitude:</span> {location.lat.toFixed(6)}</p>
+                    <p><span className="font-medium">Longitude:</span> {location.lng.toFixed(6)}</p>
+                    {location.accuracy && <p><span className="font-medium">Accuracy:</span> ±{location.accuracy.toFixed(0)}m</p>}
+                    {location.timestamp && <p><span className="font-medium">Last Update:</span> {new Date(location.timestamp).toLocaleString()}</p>}
                   </div>
                 </div>
               )}
@@ -713,57 +789,76 @@ const ProtegoApp = () => {
         )}
 
         {/* Contacts View */}
-        {currentView === 'contacts' && user && (
-          <TrustedContactsPage user={user} onUpdate={setUser} />
+        {currentView === 'contacts' && (
+          <div className="bg-white rounded-xl shadow-sm p-6">
+            <h3 className="font-semibold text-xl text-gray-800 mb-4 flex items-center">
+              <Users className="mr-2" />
+              Trusted Emergency Contacts
+            </h3>
+            <div className="space-y-3">
+              {trustedContacts.map((contact) => (
+                <div key={contact.id} className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50 transition">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h4 className="font-semibold text-gray-800">{contact.name}</h4>
+                      <p className="text-sm text-gray-600">{contact.phone}</p>
+                      <p className="text-sm text-gray-500">{contact.email}</p>
+                    </div>
+                    <Phone className="text-indigo-600" size={24} />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
         )}
 
         {/* Safety View */}
         {currentView === 'safety' && (
           <div className="space-y-6">
-            <div className="bg-white rounded-2xl shadow-md p-6">
-              <h3 className="font-semibold text-2xl text-gray-800 mb-6">Security & Privacy</h3>
-              <div className="space-y-5">
-                <div className="flex items-start space-x-4 p-4 bg-green-50 rounded-xl">
-                  <Shield className="text-green-600 flex-shrink-0" size={24} />
+            <div className="bg-white rounded-xl shadow-sm p-6">
+              <h3 className="font-semibold text-xl text-gray-800 mb-4">Security & Privacy</h3>
+              <div className="space-y-4">
+                <div className="flex items-start space-x-3">
+                  <Lock className="text-green-600 mt-1" size={20} />
                   <div>
-                    <h4 className="font-semibold text-gray-800 mb-1">End-to-End Encryption</h4>
-                    <p className="text-sm text-gray-600">All data encrypted securely with industry-standard protocols</p>
+                    <h4 className="font-semibold text-gray-800">End-to-End Encryption</h4>
+                    <p className="text-sm text-gray-600">All data encrypted securely</p>
                   </div>
                 </div>
-                <div className="flex items-start space-x-4 p-4 bg-blue-50 rounded-xl">
-                  <Map className="text-blue-600 flex-shrink-0" size={24} />
+                <div className="flex items-start space-x-3">
+                  <Shield className="text-green-600 mt-1" size={20} />
                   <div>
-                    <h4 className="font-semibold text-gray-800 mb-1">Location Privacy</h4>
-                    <p className="text-sm text-gray-600">Shared only with trusted contacts during emergencies</p>
+                    <h4 className="font-semibold text-gray-800">Location Privacy</h4>
+                    <p className="text-sm text-gray-600">Shared only with trusted contacts</p>
                   </div>
                 </div>
-                <div className="flex items-start space-x-4 p-4 bg-purple-50 rounded-xl">
-                  <Shield className="text-purple-600 flex-shrink-0" size={24} />
+                <div className="flex items-start space-x-3">
+                  <Users className="text-green-600 mt-1" size={20} />
                   <div>
-                    <h4 className="font-semibold text-gray-800 mb-1">Secure Authentication</h4>
-                    <p className="text-sm text-gray-600">JWT-based authentication with bcrypt password hashing</p>
+                    <h4 className="font-semibold text-gray-800">Role-Based Access</h4>
+                    <p className="text-sm text-gray-600">Only authorized contacts can view your data</p>
                   </div>
                 </div>
               </div>
             </div>
 
-            <div className="bg-gradient-to-br from-indigo-50 to-purple-50 rounded-2xl shadow-md p-6 border border-indigo-200">
-              <h3 className="font-semibold text-2xl text-gray-800 mb-6">Safety Tips</h3>
+            <div className="bg-white rounded-xl shadow-sm p-6">
+              <h3 className="font-semibold text-xl text-gray-800 mb-4">Safety Tips</h3>
               <ul className="space-y-3 text-sm text-gray-700">
                 <li className="flex items-start">
-                  <span className="text-indigo-600 mr-3 text-lg">•</span>
+                  <span className="text-indigo-600 mr-2">•</span>
                   <span>Keep the app running for continuous protection</span>
                 </li>
                 <li className="flex items-start">
-                  <span className="text-indigo-600 mr-3 text-lg">•</span>
+                  <span className="text-indigo-600 mr-2">•</span>
                   <span>Update your trusted contacts regularly</span>
                 </li>
                 <li className="flex items-start">
-                  <span className="text-indigo-600 mr-3 text-lg">•</span>
+                  <span className="text-indigo-600 mr-2">•</span>
                   <span>Enable location services for accurate tracking</span>
                 </li>
                 <li className="flex items-start">
-                  <span className="text-indigo-600 mr-3 text-lg">•</span>
+                  <span className="text-indigo-600 mr-2">•</span>
                   <span>Trust your instincts - if you feel unsafe, activate tracking</span>
                 </li>
               </ul>
@@ -775,4 +870,4 @@ const ProtegoApp = () => {
   );
 };
 
-export default ProtegoApp;
+export default ProteoApp;

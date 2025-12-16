@@ -48,10 +48,10 @@ def start_walk_session(
     ).first()
 
     if active_session:
-        # Automatically stop the old session instead of rejecting
-        active_session.active = False
-        active_session.end_time = datetime.now()
-        db.commit()
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="User already has an active walk session"
+        )
 
     # Create new walk session
     new_session = WalkSession(
