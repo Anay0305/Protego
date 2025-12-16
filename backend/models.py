@@ -29,6 +29,7 @@ class AlertType(str, enum.Enum):
     MOTION_ANOMALY = "MOTION_ANOMALY"
     SOUND_ANOMALY = "SOUND_ANOMALY"
     VOICE_ACTIVATION = "VOICE_ACTIVATION"
+    SOS = "SOS"
 
 
 class User(Base):
