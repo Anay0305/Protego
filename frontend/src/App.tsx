@@ -101,8 +101,11 @@ const ProtegoApp = () => {
   useEffect(() => {
     const checkAuth = async () => {
       const token = localStorage.getItem('access_token');
-      if (token) {
+
+      // If we have a token but no user in store, fetch the profile
+      if (token && !user) {
         try {
+          console.log('Token found, fetching user profile...');
           const response = await userAPI.getProfile();
           const userData = response.data;
           setUser(userData as any);
@@ -112,11 +115,19 @@ const ProtegoApp = () => {
           localStorage.removeItem('access_token');
           clearUser();
         }
+      } else if (!token && user) {
+        // Token missing but user in store - clear everything
+        console.log('No token found, clearing store...');
+        clearUser();
+      } else if (token && user) {
+        console.log('Auth already loaded from store:', user.email);
       }
     };
 
-    checkAuth();
-  }, [setUser, clearUser]);
+    // Small delay to ensure Zustand rehydration completes
+    const timer = setTimeout(checkAuth, 100);
+    return () => clearTimeout(timer);
+  }, []); // Empty deps - only run once on mount
 
   // Analyze location for safety score
   useEffect(() => {
@@ -216,6 +227,8 @@ const ProtegoApp = () => {
   };
 
   const handleAuthSuccess = (token: string, userData: User) => {
+    console.log('Auth success - Token saved, setting user:', userData.email);
+    // Token is already saved by AuthPage, just set the user
     setUser(userData as any);
     addAlert('success', 'Successfully logged in');
   };

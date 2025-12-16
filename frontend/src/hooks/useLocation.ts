@@ -11,6 +11,7 @@ export function useLocation(onAlert: (type: string, message: string) => void) {
   const [location, setLocation] = useState<Location | null>(null);
   const [isTracking, setIsTracking] = useState(false);
   const watchIdRef = useRef<number | null>(null);
+  const lastErrorAlertRef = useRef<number>(0);
 
   // Initialize location with high accuracy
   useEffect(() => {
@@ -34,7 +35,12 @@ export function useLocation(onAlert: (type: string, message: string) => void) {
         },
         (err) => {
           console.error('Location error:', err);
-          onAlert('error', `Failed to get location: ${err.message}`);
+          // Only show error alert once every 30 seconds to avoid spam
+          const now = Date.now();
+          if (now - lastErrorAlertRef.current > 30000) {
+            onAlert('error', `Failed to get location: ${err.message}`);
+            lastErrorAlertRef.current = now;
+          }
         },
         {
           enableHighAccuracy: true,
@@ -69,7 +75,12 @@ export function useLocation(onAlert: (type: string, message: string) => void) {
         },
         (error) => {
           console.error('Location tracking error:', error);
-          onAlert('error', 'Location tracking error: ' + error.message);
+          // Only show error alert once every 30 seconds to avoid spam
+          const now = Date.now();
+          if (now - lastErrorAlertRef.current > 30000) {
+            onAlert('error', 'Location tracking error: ' + error.message);
+            lastErrorAlertRef.current = now;
+          }
         },
         {
           enableHighAccuracy: true,

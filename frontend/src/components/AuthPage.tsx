@@ -87,13 +87,21 @@ export default function AuthPage({ onSuccess }: AuthPageProps) {
         };
 
         const response = await userAPI.signup(userData);
-        localStorage.setItem('access_token', response.data.access_token);
-        onSuccess(response.data.access_token, response.data.user);
+        const token = response.data.access_token;
+        const user = response.data.user;
+        console.log('Signup successful, saving token for user:', user.email);
+        localStorage.setItem('access_token', token);
+        console.log('Token saved to localStorage:', localStorage.getItem('access_token')?.substring(0, 20) + '...');
+        onSuccess(token, user);
       } else {
         // Sign in
         const response = await userAPI.signin({ email, password });
-        localStorage.setItem('access_token', response.data.access_token);
-        onSuccess(response.data.access_token, response.data.user);
+        const token = response.data.access_token;
+        const user = response.data.user;
+        console.log('Signin successful, saving token for user:', user.email);
+        localStorage.setItem('access_token', token);
+        console.log('Token saved to localStorage:', localStorage.getItem('access_token')?.substring(0, 20) + '...');
+        onSuccess(token, user);
       }
     } catch (err: any) {
       const message = err.response?.data?.detail || err.message || 'An error occurred';

@@ -53,13 +53,16 @@ export const useUserStore = create<UserStore>()(
         set((state) => ({
           user: state.user ? { ...state.user, ...updates } : null,
         })),
-      clearUser: () => set({
-        user: null,
-        isAuthenticated: false,
-        activeSession: null,
-        isWalking: false,
-        pendingAlert: null
-      }),
+      clearUser: () => {
+        localStorage.removeItem('access_token');
+        set({
+          user: null,
+          isAuthenticated: false,
+          activeSession: null,
+          isWalking: false,
+          pendingAlert: null
+        });
+      },
 
       startSession: (session) =>
         set({ activeSession: session, isWalking: true }),
@@ -70,6 +73,9 @@ export const useUserStore = create<UserStore>()(
     }),
     {
       name: 'protego-store',
+      onRehydrateStorage: () => (state) => {
+        console.log('Zustand store rehydrated:', state?.isAuthenticated);
+      },
     }
   )
 );
