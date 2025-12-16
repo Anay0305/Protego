@@ -12,9 +12,13 @@ export function useLocation(onAlert: (type: string, message: string) => void) {
   const [isTracking, setIsTracking] = useState(false);
   const watchIdRef = useRef<number | null>(null);
   const lastErrorAlertRef = useRef<number>(0);
+  const hasInitialLocationRef = useRef<boolean>(false);
 
-  // Initialize location with high accuracy
+  // Initialize location with high accuracy (only once)
   useEffect(() => {
+    // Prevent re-running if we already have initial location
+    if (hasInitialLocationRef.current) return;
+
     if (navigator.geolocation) {
       console.log('Requesting initial location with high accuracy...');
       navigator.geolocation.getCurrentPosition(
@@ -31,6 +35,7 @@ export function useLocation(onAlert: (type: string, message: string) => void) {
             lng: loc.lng.toFixed(6),
             accuracy: `±${loc.accuracy.toFixed(0)}m`
           });
+          hasInitialLocationRef.current = true;
           onAlert('success', `Location acquired (±${loc.accuracy.toFixed(0)}m accuracy)`);
         },
         (err) => {
@@ -51,7 +56,7 @@ export function useLocation(onAlert: (type: string, message: string) => void) {
     } else {
       onAlert('error', 'Geolocation not supported by this browser');
     }
-  }, [onAlert]);
+  }, []); // Empty deps - only run once on mount
 
   const startTracking = () => {
     if ('geolocation' in navigator) {
