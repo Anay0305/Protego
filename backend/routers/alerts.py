@@ -64,10 +64,10 @@ async def create_alert(
     # Check if confidence meets threshold
     if alert_data.confidence >= settings.alert_confidence_threshold:
         # Start countdown in background
+        # Note: Pass only alert_id, not db session (will create fresh session)
         background_tasks.add_task(
             alert_manager.start_alert_countdown,
-            new_alert.id,
-            db
+            new_alert.id
         )
 
     return new_alert
@@ -265,6 +265,12 @@ async def create_instant_alert(
     db.refresh(new_alert)
 
     # Trigger immediately without countdown
-    await alert_manager._trigger_alert(new_alert.id, db)
+    # Create a fresh session to ensure we get latest user data
+    from database import SessionLocal
+    trigger_db = SessionLocal()
+    try:
+        await alert_manager._trigger_alert(new_alert.id, trigger_db)
+    finally:
+        trigger_db.close()
 
     return new_alert

@@ -28,8 +28,7 @@ class AlertManager:
 
     async def start_alert_countdown(
         self,
-        alert_id: int,
-        db: Session
+        alert_id: int
     ) -> bool:
         """
         Start countdown timer for an alert.
@@ -37,7 +36,6 @@ class AlertManager:
 
         Args:
             alert_id: ID of the alert to start countdown for
-            db: Database session
 
         Returns:
             True if countdown started successfully
@@ -47,9 +45,9 @@ class AlertManager:
             logger.warning(f"Alert {alert_id} already has pending countdown")
             return False
 
-        # Create countdown task
+        # Create countdown task (will create its own db session)
         task = asyncio.create_task(
-            self._countdown_and_trigger(alert_id, db)
+            self._countdown_and_trigger(alert_id)
         )
         self.pending_alerts[alert_id] = task
 
@@ -95,22 +93,28 @@ class AlertManager:
 
     async def _countdown_and_trigger(
         self,
-        alert_id: int,
-        db: Session
+        alert_id: int
     ) -> None:
         """
         Internal method to handle countdown and trigger notifications.
+        Creates its own database session to avoid stale session issues.
 
         Args:
             alert_id: ID of the alert
-            db: Database session
         """
+        from database import SessionLocal
+
         try:
             # Wait for countdown period
             await asyncio.sleep(settings.alert_countdown_seconds)
 
-            # After countdown, trigger the alert
-            await self._trigger_alert(alert_id, db)
+            # Create fresh database session for the background task
+            db = SessionLocal()
+            try:
+                # After countdown, trigger the alert
+                await self._trigger_alert(alert_id, db)
+            finally:
+                db.close()
 
         except asyncio.CancelledError:
             logger.info(f"Countdown for alert {alert_id} was cancelled")
