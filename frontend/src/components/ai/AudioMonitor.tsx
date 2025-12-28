@@ -50,31 +50,16 @@ export default function AudioMonitor({
     onAnalysisComplete: () => {
       setAnalysisCount(prev => prev + 1);
     },
+    // Auto-analyze every 10 seconds when enabled
+    autoAnalyzeInterval: 10000,
   });
-
-  // Auto-analyze when walking and audio is enabled
-  useEffect(() => {
-    if (!isWalking || !audioEnabled) return;
-
-    // Analyze every 10 seconds during walk
-    const interval = setInterval(() => {
-      if (!isAnalyzing && !isRecording) {
-        recordAndAnalyze(3000); // Record 3 seconds
-      }
-    }, 10000);
-
-    // Initial analysis
-    recordAndAnalyze(3000);
-
-    return () => clearInterval(interval);
-  }, [isWalking, audioEnabled, isAnalyzing, isRecording, recordAndAnalyze]);
 
   // Disable audio when not walking
   useEffect(() => {
     if (!isWalking && audioEnabled) {
       toggleAudioCapture();
     }
-  }, [isWalking]);
+  }, [isWalking, audioEnabled, toggleAudioCapture]);
 
   if (!isWalking) {
     return null;
