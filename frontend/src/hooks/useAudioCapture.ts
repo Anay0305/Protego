@@ -241,24 +241,43 @@ export function useAudioCapture(options: UseAudioCaptureOptions = {}) {
     }
   }, [audioEnabled, isRecording, stopRecording, initializeMicrophone, addLog]);
 
+  // Use refs to track state for interval callback
+  const isAnalyzingRef = useRef(isAnalyzing);
+  const isRecordingRef = useRef(isRecording);
+
+  useEffect(() => {
+    isAnalyzingRef.current = isAnalyzing;
+  }, [isAnalyzing]);
+
+  useEffect(() => {
+    isRecordingRef.current = isRecording;
+  }, [isRecording]);
+
   // Auto-analyze at intervals when enabled
   useEffect(() => {
     if (audioEnabled && autoAnalyzeInterval > 0) {
       addLog(`Auto-analysis enabled: every ${autoAnalyzeInterval / 1000}s`, 'info');
 
-      autoAnalyzeIntervalRef.current = setInterval(async () => {
-        if (!isAnalyzing && !isRecording) {
+      const runAnalysis = async () => {
+        // Use refs to avoid stale closure
+        if (!isAnalyzingRef.current && !isRecordingRef.current) {
           await recordAndAnalyze(3000); // Record 3 seconds
         }
-      }, autoAnalyzeInterval);
+      };
+
+      // Run once immediately
+      runAnalysis();
+
+      autoAnalyzeIntervalRef.current = setInterval(runAnalysis, autoAnalyzeInterval);
 
       return () => {
         if (autoAnalyzeIntervalRef.current) {
           clearInterval(autoAnalyzeIntervalRef.current);
+          autoAnalyzeIntervalRef.current = null;
         }
       };
     }
-  }, [audioEnabled, autoAnalyzeInterval, isAnalyzing, isRecording, recordAndAnalyze, addLog]);
+  }, [audioEnabled, autoAnalyzeInterval, recordAndAnalyze, addLog]);
 
   // Cleanup on unmount
   useEffect(() => {

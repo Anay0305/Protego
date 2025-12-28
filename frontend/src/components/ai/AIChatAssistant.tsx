@@ -2,6 +2,104 @@ import { useState, useRef, useEffect } from 'react';
 import { MessageCircle, Send, X, Bot, User, Sparkles, Loader2 } from 'lucide-react';
 import { aiAPI } from '../../services/api';
 
+// Simple markdown renderer for chat messages
+function renderMarkdown(text: string): JSX.Element {
+  // Split by lines to handle lists and paragraphs
+  const lines = text.split('\n');
+  const elements: JSX.Element[] = [];
+  let listItems: string[] = [];
+  let listType: 'ul' | 'ol' | null = null;
+
+  const processInlineMarkdown = (line: string): JSX.Element => {
+    // Process bold (**text** or __text__)
+    // Process italic (*text* or _text_)
+    const parts: (string | JSX.Element)[] = [];
+    let remaining = line;
+    let keyIndex = 0;
+
+    // Bold: **text**
+    while (remaining.includes('**')) {
+      const startIdx = remaining.indexOf('**');
+      if (startIdx > 0) {
+        parts.push(remaining.substring(0, startIdx));
+      }
+      const endIdx = remaining.indexOf('**', startIdx + 2);
+      if (endIdx === -1) {
+        parts.push(remaining.substring(startIdx));
+        remaining = '';
+        break;
+      }
+      parts.push(<strong key={`b-${keyIndex++}`}>{remaining.substring(startIdx + 2, endIdx)}</strong>);
+      remaining = remaining.substring(endIdx + 2);
+    }
+    if (remaining) parts.push(remaining);
+
+    return <>{parts}</>;
+  };
+
+  const flushList = () => {
+    if (listItems.length > 0 && listType) {
+      const ListTag = listType;
+      elements.push(
+        <ListTag key={`list-${elements.length}`} className={listType === 'ul' ? 'list-disc ml-4 space-y-1' : 'list-decimal ml-4 space-y-1'}>
+          {listItems.map((item, i) => (
+            <li key={i}>{processInlineMarkdown(item)}</li>
+          ))}
+        </ListTag>
+      );
+      listItems = [];
+      listType = null;
+    }
+  };
+
+  lines.forEach((line, idx) => {
+    const trimmed = line.trim();
+
+    // Numbered list (1. item)
+    const numberedMatch = trimmed.match(/^(\d+)\.\s+(.+)$/);
+    if (numberedMatch) {
+      if (listType !== 'ol') {
+        flushList();
+        listType = 'ol';
+      }
+      listItems.push(numberedMatch[2]);
+      return;
+    }
+
+    // Bullet list (- item or * item)
+    const bulletMatch = trimmed.match(/^[-*]\s+(.+)$/);
+    if (bulletMatch) {
+      if (listType !== 'ul') {
+        flushList();
+        listType = 'ul';
+      }
+      listItems.push(bulletMatch[1]);
+      return;
+    }
+
+    // Not a list item, flush any pending list
+    flushList();
+
+    // Empty line
+    if (!trimmed) {
+      elements.push(<br key={`br-${idx}`} />);
+      return;
+    }
+
+    // Regular paragraph
+    elements.push(
+      <p key={`p-${idx}`} className="mb-1">
+        {processInlineMarkdown(trimmed)}
+      </p>
+    );
+  });
+
+  // Flush any remaining list
+  flushList();
+
+  return <div className="space-y-1">{elements}</div>;
+}
+
 interface Message {
   id: string;
   role: 'user' | 'assistant';
@@ -179,7 +277,12 @@ export default function AIChatAssistant({
                         : 'bg-white text-gray-800 shadow-sm rounded-bl-md'
                     }`}
                   >
-                    <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+                    <div className="text-sm">
+                      {message.role === 'assistant'
+                        ? renderMarkdown(message.content)
+                        : <p className="whitespace-pre-wrap">{message.content}</p>
+                      }
+                    </div>
                     <p
                       className={`text-xs mt-1 ${
                         message.role === 'user' ? 'text-indigo-200' : 'text-gray-400'
@@ -291,7 +394,12 @@ export default function AIChatAssistant({
                   : 'bg-white text-gray-800 shadow-sm rounded-bl-md'
               }`}
             >
-              <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+              <div className="text-sm">
+                {message.role === 'assistant'
+                  ? renderMarkdown(message.content)
+                  : <p className="whitespace-pre-wrap">{message.content}</p>
+                }
+              </div>
             </div>
           </div>
         ))}
