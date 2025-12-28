@@ -1,19 +1,19 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, ReactNode } from 'react';
 import { MessageCircle, Send, X, Bot, User, Sparkles, Loader2 } from 'lucide-react';
 import { aiAPI } from '../../services/api';
 
 // Simple markdown renderer for chat messages
-function renderMarkdown(text: string): JSX.Element {
+function renderMarkdown(text: string): ReactNode {
   // Split by lines to handle lists and paragraphs
   const lines = text.split('\n');
-  const elements: JSX.Element[] = [];
+  const elements: ReactNode[] = [];
   let listItems: string[] = [];
   let listType: 'ul' | 'ol' | null = null;
 
-  const processInlineMarkdown = (line: string): JSX.Element => {
+  const processInlineMarkdown = (line: string): ReactNode => {
     // Process bold (**text** or __text__)
     // Process italic (*text* or _text_)
-    const parts: (string | JSX.Element)[] = [];
+    const parts: ReactNode[] = [];
     let remaining = line;
     let keyIndex = 0;
 

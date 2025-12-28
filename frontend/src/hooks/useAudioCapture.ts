@@ -47,6 +47,7 @@ export function useAudioCapture(options: UseAudioCaptureOptions = {}) {
   const audioChunksRef = useRef<Blob[]>([]);
   const streamRef = useRef<MediaStream | null>(null);
   const autoAnalyzeIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const isRecordingInProgressRef = useRef(false); // Lock to prevent concurrent recordings
 
   const addLog = useCallback((message: string, type: AudioCaptureLog['type'] = 'info') => {
     const timestamp = new Date().toLocaleTimeString();
@@ -83,8 +84,11 @@ export function useAudioCapture(options: UseAudioCaptureOptions = {}) {
 
   // Start recording audio
   const startRecording = useCallback(async () => {
-    if (isRecording) {
-      addLog('Already recording', 'warning');
+    if (isRecording || isRecordingInProgressRef.current) {
+      // Only log if not already being handled by the lock
+      if (isRecording) {
+        addLog('Already recording', 'warning');
+      }
       return false;
     }
 
@@ -204,19 +208,33 @@ export function useAudioCapture(options: UseAudioCaptureOptions = {}) {
 
   // Record for a specific duration and analyze
   const recordAndAnalyze = useCallback(async (durationMs: number = 5000) => {
-    addLog(`Recording for ${durationMs / 1000}s...`, 'info');
+    // Prevent concurrent recordings using lock
+    if (isRecordingInProgressRef.current) {
+      console.log('[Audio] Recording already in progress, skipping');
+      return null;
+    }
 
-    const started = await startRecording();
-    if (!started) return null;
+    isRecordingInProgressRef.current = true;
 
-    // Wait for the specified duration
-    await new Promise(resolve => setTimeout(resolve, durationMs));
+    try {
+      addLog(`Recording for ${durationMs / 1000}s...`, 'info');
 
-    const audioBlob = await stopRecording();
-    if (!audioBlob) return null;
+      const started = await startRecording();
+      if (!started) {
+        return null;
+      }
 
-    return analyzeAudio(audioBlob);
-  }, [startRecording, stopRecording, analyzeAudio]);
+      // Wait for the specified duration
+      await new Promise(resolve => setTimeout(resolve, durationMs));
+
+      const audioBlob = await stopRecording();
+      if (!audioBlob) return null;
+
+      return await analyzeAudio(audioBlob);
+    } finally {
+      isRecordingInProgressRef.current = false;
+    }
+  }, [startRecording, stopRecording, analyzeAudio, addLog]);
 
   // Toggle audio capture on/off
   const toggleAudioCapture = useCallback(async () => {
@@ -241,9 +259,10 @@ export function useAudioCapture(options: UseAudioCaptureOptions = {}) {
     }
   }, [audioEnabled, isRecording, stopRecording, initializeMicrophone, addLog]);
 
-  // Use refs to track state for interval callback
+  // Use refs to track state and functions for interval callback to avoid stale closures
   const isAnalyzingRef = useRef(isAnalyzing);
   const isRecordingRef = useRef(isRecording);
+  const recordAndAnalyzeRef = useRef(recordAndAnalyze);
 
   useEffect(() => {
     isAnalyzingRef.current = isAnalyzing;
@@ -253,31 +272,39 @@ export function useAudioCapture(options: UseAudioCaptureOptions = {}) {
     isRecordingRef.current = isRecording;
   }, [isRecording]);
 
+  useEffect(() => {
+    recordAndAnalyzeRef.current = recordAndAnalyze;
+  }, [recordAndAnalyze]);
+
   // Auto-analyze at intervals when enabled
   useEffect(() => {
-    if (audioEnabled && autoAnalyzeInterval > 0) {
-      addLog(`Auto-analysis enabled: every ${autoAnalyzeInterval / 1000}s`, 'info');
-
-      const runAnalysis = async () => {
-        // Use refs to avoid stale closure
-        if (!isAnalyzingRef.current && !isRecordingRef.current) {
-          await recordAndAnalyze(3000); // Record 3 seconds
-        }
-      };
-
-      // Run once immediately
-      runAnalysis();
-
-      autoAnalyzeIntervalRef.current = setInterval(runAnalysis, autoAnalyzeInterval);
-
-      return () => {
-        if (autoAnalyzeIntervalRef.current) {
-          clearInterval(autoAnalyzeIntervalRef.current);
-          autoAnalyzeIntervalRef.current = null;
-        }
-      };
+    if (!audioEnabled || autoAnalyzeInterval <= 0) {
+      return;
     }
-  }, [audioEnabled, autoAnalyzeInterval, recordAndAnalyze, addLog]);
+
+    console.log('[Audio] Setting up auto-analyze interval');
+
+    const runAnalysis = async () => {
+      // Use refs to avoid stale closure and check lock
+      if (!isAnalyzingRef.current && !isRecordingRef.current && !isRecordingInProgressRef.current) {
+        await recordAndAnalyzeRef.current(3000); // Record 3 seconds
+      }
+    };
+
+    // Run once immediately after a short delay
+    const initialTimeout = setTimeout(runAnalysis, 500);
+
+    // Then run at intervals
+    autoAnalyzeIntervalRef.current = setInterval(runAnalysis, autoAnalyzeInterval);
+
+    return () => {
+      clearTimeout(initialTimeout);
+      if (autoAnalyzeIntervalRef.current) {
+        clearInterval(autoAnalyzeIntervalRef.current);
+        autoAnalyzeIntervalRef.current = null;
+      }
+    };
+  }, [audioEnabled, autoAnalyzeInterval]); // Removed recordAndAnalyze and addLog from deps
 
   // Cleanup on unmount
   useEffect(() => {
