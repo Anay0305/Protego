@@ -40,6 +40,11 @@ class Settings(BaseSettings):
     megallm_api_key: str = ""
     megallm_model: str = "gpt-4.1"
 
+    # Azure OpenAI Realtime (for real-time voice analysis)
+    azure_openai_realtime_endpoint: str = ""
+    azure_openai_realtime_api_key: str = ""
+    azure_openai_realtime_deployment: str = "gpt-4o-realtime-preview"
+
     model_config = SettingsConfigDict(
         env_file=".env",
         case_sensitive=False,

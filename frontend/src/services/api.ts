@@ -179,9 +179,16 @@ interface QuickAnalysisResponse {
 interface AIStatusResponse {
   whisper_configured: boolean;
   megallm_configured: boolean;
+  realtime_configured: boolean;
   test_mode: boolean;
   model: string;
   confidence_threshold: number;
+}
+
+interface RealtimeConfigResponse {
+  ws_url: string;
+  deployment: string;
+  instructions: string;
 }
 
 interface LocationSafetyResponse {
@@ -258,6 +265,10 @@ export const aiAPI = {
     context?: string
   ): Promise<AxiosResponse<LocationSafetyResponse>> =>
     api.post('/ai/analyze/location', { latitude, longitude, timestamp, context }),
+
+  // Get realtime WebSocket configuration
+  getRealtimeConfig: (): Promise<AxiosResponse<RealtimeConfigResponse>> =>
+    api.get('/ai/realtime/config'),
 };
 
 export type {
@@ -271,4 +282,5 @@ export type {
   QuickAnalysisResponse,
   AIStatusResponse,
   LocationSafetyResponse,
+  RealtimeConfigResponse,
 };

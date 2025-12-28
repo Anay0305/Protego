@@ -356,7 +356,54 @@ async def get_ai_status():
     return {
         "whisper_configured": bool(settings.whisper_api_key),
         "megallm_configured": bool(settings.megallm_api_key),
+        "realtime_configured": bool(settings.azure_openai_realtime_api_key),
         "test_mode": settings.test_mode,
         "model": settings.megallm_model,
         "confidence_threshold": settings.alert_confidence_threshold
+    }
+
+
+@router.get("/realtime/config")
+async def get_realtime_config(current_user: User = Depends(get_current_user)):
+    """
+    Get Azure OpenAI Realtime WebSocket configuration.
+    Returns the WebSocket URL with API key for authenticated users.
+    """
+    if not settings.azure_openai_realtime_api_key:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Azure OpenAI Realtime API not configured"
+        )
+
+    # Build WebSocket URL
+    endpoint = settings.azure_openai_realtime_endpoint
+    deployment = settings.azure_openai_realtime_deployment
+    api_key = settings.azure_openai_realtime_api_key
+
+    ws_url = f"{endpoint}/openai/realtime?api-version=2024-10-01-preview&deployment={deployment}&api-key={api_key}"
+
+    return {
+        "ws_url": ws_url,
+        "deployment": deployment,
+        "instructions": """You are a safety monitoring AI for Protego, a personal safety app.
+Your task is to listen to audio and detect signs of distress or danger.
+
+IMPORTANT: You must respond in JSON format only:
+{
+  "distress_detected": boolean,
+  "distress_type": "SCREAM" | "HELP_CALL" | "PANIC" | "CRYING" | "NONE",
+  "confidence": float (0-1),
+  "transcript": "what you heard",
+  "keywords": ["list", "of", "distress", "keywords"],
+  "action": "trigger_alert" | "monitor" | "none"
+}
+
+Listen for:
+- Calls for help (explicit or implicit)
+- Screams or yelling
+- Signs of fear, panic, or distress
+- Sounds of struggle or danger
+- Keywords: help, stop, no, please, emergency, danger, hurt, scared
+
+Be sensitive and respond quickly to potential emergencies."""
     }
