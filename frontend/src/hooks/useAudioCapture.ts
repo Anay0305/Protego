@@ -130,6 +130,7 @@ export function useAudioCapture(options: UseAudioCaptureOptions = {}) {
       mediaRecorder.start(1000); // Collect data every second
       setIsRecording(true);
       addLog('Recording started', 'success');
+      console.log('[Audio] MediaRecorder started, state:', mediaRecorder.state);
       return true;
     } catch (err: any) {
       addLog(`Failed to start recording: ${err.message}`, 'error');
@@ -141,9 +142,26 @@ export function useAudioCapture(options: UseAudioCaptureOptions = {}) {
   const stopRecording = useCallback((): Promise<Blob | null> => {
     return new Promise((resolve) => {
       const recorder = mediaRecorderRef.current;
+      console.log('[Audio] stopRecording - recorder:', recorder, 'state:', recorder?.state, 'chunks:', audioChunksRef.current.length);
+
       // Check recorder state directly instead of React state (which may be stale)
-      if (!recorder || recorder.state === 'inactive') {
-        addLog('Not recording', 'warning');
+      if (!recorder) {
+        addLog('No recorder found', 'warning');
+        resolve(null);
+        return;
+      }
+
+      if (recorder.state === 'inactive') {
+        // If we have chunks, create blob anyway
+        if (audioChunksRef.current.length > 0) {
+          const mimeType = recorder.mimeType || 'audio/webm';
+          const audioBlob = new Blob(audioChunksRef.current, { type: mimeType });
+          addLog(`Recording stopped (was inactive). Size: ${(audioBlob.size / 1024).toFixed(1)}KB`, 'info');
+          setIsRecording(false);
+          resolve(audioBlob);
+          return;
+        }
+        addLog('Not recording (inactive, no chunks)', 'warning');
         resolve(null);
         return;
       }
@@ -206,7 +224,7 @@ export function useAudioCapture(options: UseAudioCaptureOptions = {}) {
     }
   }, [sessionId, locationLat, locationLng, onDistressDetected, onAnalysisComplete, addLog]);
 
-  // Record for a specific duration and analyze
+  // Record for a specific duration and analyze - self-contained to avoid stale closure issues
   const recordAndAnalyze = useCallback(async (durationMs: number = 5000) => {
     // Prevent concurrent recordings using lock
     if (isRecordingInProgressRef.current) {
@@ -219,29 +237,77 @@ export function useAudioCapture(options: UseAudioCaptureOptions = {}) {
     try {
       addLog(`Recording for ${durationMs / 1000}s...`, 'info');
 
-      const started = await startRecording();
-      console.log('[Audio] startRecording returned:', started);
-      if (!started) {
-        addLog('Failed to start recording', 'error');
-        return null;
+      // Initialize microphone if needed
+      if (!streamRef.current) {
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia({
+            audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+          });
+          streamRef.current = stream;
+        } catch (err: any) {
+          addLog(`Microphone error: ${err.message}`, 'error');
+          return null;
+        }
       }
+
+      // Create fresh recorder and chunks array
+      const chunks: Blob[] = [];
+      const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
+        ? 'audio/webm;codecs=opus'
+        : MediaRecorder.isTypeSupported('audio/webm')
+          ? 'audio/webm'
+          : 'audio/mp4';
+
+      const recorder = new MediaRecorder(streamRef.current!, {
+        mimeType,
+        audioBitsPerSecond: 128000,
+      });
+
+      // Collect chunks
+      recorder.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          chunks.push(event.data);
+        }
+      };
+
+      // Start recording
+      recorder.start(500); // Collect data every 500ms
+      setIsRecording(true);
+      addLog('Recording started', 'success');
 
       // Wait for the specified duration
       await new Promise(resolve => setTimeout(resolve, durationMs));
 
-      console.log('[Audio] Stopping recording...');
-      const audioBlob = await stopRecording();
-      console.log('[Audio] stopRecording returned blob:', audioBlob?.size);
-      if (!audioBlob) {
-        addLog('No audio blob returned', 'error');
+      // Stop and get blob
+      const audioBlob = await new Promise<Blob | null>((resolve) => {
+        recorder.onstop = () => {
+          if (chunks.length > 0) {
+            const blob = new Blob(chunks, { type: mimeType });
+            resolve(blob);
+          } else {
+            resolve(null);
+          }
+        };
+        recorder.stop();
+      });
+
+      setIsRecording(false);
+
+      if (!audioBlob || audioBlob.size === 0) {
+        addLog('No audio captured', 'warning');
         return null;
       }
 
+      addLog(`Recording stopped. Size: ${(audioBlob.size / 1024).toFixed(1)}KB`, 'info');
       return await analyzeAudio(audioBlob);
+    } catch (err: any) {
+      addLog(`Recording error: ${err.message}`, 'error');
+      setIsRecording(false);
+      return null;
     } finally {
       isRecordingInProgressRef.current = false;
     }
-  }, [startRecording, stopRecording, analyzeAudio, addLog]);
+  }, [analyzeAudio, addLog]);
 
   // Toggle audio capture on/off
   const toggleAudioCapture = useCallback(async () => {
