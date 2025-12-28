@@ -46,7 +46,7 @@ export function useAudioCapture(options: UseAudioCaptureOptions = {}) {
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const streamRef = useRef<MediaStream | null>(null);
-  const autoAnalyzeIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const autoAnalyzeIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const addLog = useCallback((message: string, type: AudioCaptureLog['type'] = 'info') => {
     const timestamp = new Date().toLocaleTimeString();
