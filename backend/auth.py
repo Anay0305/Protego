@@ -2,6 +2,7 @@
 Authentication utilities for JWT token generation and password hashing.
 """
 
+import logging
 from datetime import datetime, timedelta
 from typing import Optional
 from jose import JWTError, jwt
@@ -13,6 +14,10 @@ from sqlalchemy.orm import Session
 from config import settings
 from database import get_db
 from models import User
+
+# Set up logging
+logger = logging.getLogger(__name__)
+logging.basicConfig(level=logging.DEBUG)
 
 # Password hashing context
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -49,11 +54,11 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -
         expire = datetime.utcnow() + timedelta(days=7)  # Default 7 days
 
     to_encode.update({"exp": expire})
-    print(f"[AUTH DEBUG] Creating token with secret_key: {settings.secret_key[:20]}...")
-    print(f"[AUTH DEBUG] Creating token with algorithm: {settings.algorithm}")
-    print(f"[AUTH DEBUG] Token payload: {to_encode}")
+    logger.warning(f"[AUTH] Creating token with secret_key: {settings.secret_key[:20]}...")
+    logger.warning(f"[AUTH] Creating token with algorithm: {settings.algorithm}")
+    logger.warning(f"[AUTH] Token payload: {to_encode}")
     encoded_jwt = jwt.encode(to_encode, settings.secret_key, algorithm=settings.algorithm)
-    print(f"[AUTH DEBUG] Created token: {encoded_jwt[:50]}...")
+    logger.warning(f"[AUTH] Created token: {encoded_jwt[:50]}...")
     return encoded_jwt
 
 
@@ -71,14 +76,14 @@ def decode_access_token(token: str) -> dict:
         HTTPException: If token is invalid or expired
     """
     try:
-        print(f"[AUTH DEBUG] Decoding token: {token[:50]}...")
-        print(f"[AUTH DEBUG] Using secret_key: {settings.secret_key[:20]}...")
-        print(f"[AUTH DEBUG] Using algorithm: {settings.algorithm}")
+        logger.warning(f"[AUTH] Decoding token: {token[:50]}...")
+        logger.warning(f"[AUTH] Using secret_key: {settings.secret_key[:20]}...")
+        logger.warning(f"[AUTH] Using algorithm: {settings.algorithm}")
         payload = jwt.decode(token, settings.secret_key, algorithms=[settings.algorithm])
-        print(f"[AUTH DEBUG] Decoded payload: {payload}")
+        logger.warning(f"[AUTH] Decoded payload: {payload}")
         return payload
     except JWTError as e:
-        print(f"[AUTH DEBUG] JWTError: {e}")
+        logger.error(f"[AUTH] JWTError: {e}")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Could not validate credentials",
@@ -103,16 +108,16 @@ def get_current_user(
     Raises:
         HTTPException: If authentication fails
     """
-    print(f"[AUTH DEBUG] get_current_user called")
-    print(f"[AUTH DEBUG] credentials: {credentials}")
+    logger.warning(f"[AUTH] get_current_user called")
+    logger.warning(f"[AUTH] credentials: {credentials}")
     token = credentials.credentials
-    print(f"[AUTH DEBUG] token from credentials: {token[:50] if token else 'None'}...")
+    logger.warning(f"[AUTH] token from credentials: {token[:50] if token else 'None'}...")
     payload = decode_access_token(token)
 
     user_id_raw = payload.get("sub")
-    print(f"[AUTH DEBUG] user_id_raw from payload: {user_id_raw}, type: {type(user_id_raw)}")
+    logger.warning(f"[AUTH] user_id_raw from payload: {user_id_raw}, type: {type(user_id_raw)}")
     if user_id_raw is None:
-        print("[AUTH DEBUG] user_id_raw is None!")
+        logger.error("[AUTH] user_id_raw is None!")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Could not validate credentials",
@@ -122,27 +127,27 @@ def get_current_user(
     # Convert to int (JWT returns strings)
     try:
         user_id = int(user_id_raw)
-        print(f"[AUTH DEBUG] converted user_id: {user_id}")
+        logger.warning(f"[AUTH] converted user_id: {user_id}")
     except (ValueError, TypeError) as e:
-        print(f"[AUTH DEBUG] Failed to convert user_id: {e}")
+        logger.error(f"[AUTH] Failed to convert user_id: {e}")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Could not validate credentials",
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    print(f"[AUTH DEBUG] Looking up user with id={user_id}")
+    logger.warning(f"[AUTH] Looking up user with id={user_id}")
     user = db.query(User).filter(User.id == user_id).first()
-    print(f"[AUTH DEBUG] User lookup result: {user}")
+    logger.warning(f"[AUTH] User lookup result: {user}")
     if user is None:
-        print(f"[AUTH DEBUG] User with id={user_id} not found!")
+        logger.error(f"[AUTH] User with id={user_id} not found!")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="User not found",
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    print(f"[AUTH DEBUG] Successfully authenticated user: {user.email}")
+    logger.warning(f"[AUTH] Successfully authenticated user: {user.email}")
     return user
 
 

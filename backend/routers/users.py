@@ -13,7 +13,8 @@ from schemas import (
     UserCreate, UserLogin, UserUpdate, UserResponse, AuthResponse,
     TrustedContactAdd, TrustedContactRemove
 )
-from auth import get_password_hash, authenticate_user, create_access_token, get_current_user
+from auth import get_password_hash, authenticate_user, create_access_token, get_current_user, decode_access_token
+from config import settings
 
 router = APIRouter()
 
@@ -235,3 +236,49 @@ def get_trusted_contacts(current_user: User = Depends(get_current_user)):
         List of trusted contact phone numbers
     """
     return current_user.trusted_contacts
+
+
+@router.post("/debug-token")
+def debug_token(token_data: dict, db: Session = Depends(get_db)):
+    """
+    Debug endpoint to test token validation.
+    This is a temporary endpoint for debugging purposes.
+    """
+    from jose import jwt, JWTError
+
+    token = token_data.get("token", "")
+    result = {
+        "token_received": token[:50] + "..." if len(token) > 50 else token,
+        "secret_key_prefix": settings.secret_key[:20] + "...",
+        "algorithm": settings.algorithm,
+    }
+
+    # Try to decode without verification first
+    try:
+        unverified = jwt.get_unverified_claims(token)
+        result["unverified_claims"] = unverified
+    except Exception as e:
+        result["unverified_error"] = str(e)
+
+    # Try to decode with verification
+    try:
+        verified = jwt.decode(token, settings.secret_key, algorithms=[settings.algorithm])
+        result["verified_claims"] = verified
+        result["verification_success"] = True
+    except JWTError as e:
+        result["verification_error"] = str(e)
+        result["verification_success"] = False
+    except Exception as e:
+        result["verification_error"] = f"Unexpected: {str(e)}"
+        result["verification_success"] = False
+
+    # If we got a user_id, try to look up the user
+    if result.get("verified_claims"):
+        user_id = result["verified_claims"].get("sub")
+        if user_id:
+            user = db.query(User).filter(User.id == user_id).first()
+            result["user_found"] = user is not None
+            if user:
+                result["user_email"] = user.email
+
+    return result
