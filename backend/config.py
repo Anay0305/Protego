@@ -33,6 +33,13 @@ class Settings(BaseSettings):
     # Environment
     environment: str = "development"
 
+    # AI Services
+    whisper_endpoint: str = "https://chutes-whisper-large-v3.chutes.ai/transcribe"
+    whisper_api_key: str = ""
+    megallm_endpoint: str = "https://api.megallm.io/v1/chat/completions"
+    megallm_api_key: str = ""
+    megallm_model: str = "gpt-4.1"
+
     model_config = SettingsConfigDict(
         env_file=".env",
         case_sensitive=False,

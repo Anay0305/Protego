@@ -9,7 +9,8 @@ import WalkControl from './components/dashboard/WalkControl';
 import AlertsList from './components/dashboard/AlertsList';
 import TrackingView from './components/tracking/TrackingView';
 import SafetyView from './components/SafetyView';
-import { userAPI, walkAPI, alertAPI, User } from './services/api';
+import { AIChatAssistant, SafetySummary, AudioMonitor } from './components/ai';
+import { userAPI, walkAPI, alertAPI, aiAPI, User } from './services/api';
 import { useUserStore } from './store/useUserStore';
 import { useLocation } from './hooks/useLocation';
 import { useVoiceRecognition } from './hooks/useVoiceRecognition';
@@ -129,26 +130,49 @@ const ProtegoApp = () => {
     return () => clearTimeout(timer);
   }, []); // Empty deps - only run once on mount
 
-  // Analyze location for safety score
+  // Analyze location for safety score using AI
   useEffect(() => {
-    if (location) {
-      const hour = new Date().getHours();
-      const isNightTime = hour < 6 || hour > 20;
-      const randomFactor = Math.random();
+    if (!location || !isWalking) return;
 
-      if (randomFactor > 0.95) {
-        setWalkingStatus('alert');
-        setSafetyScore(45);
-        addAlert('warning', 'Unusual movement pattern detected');
-      } else if (isNightTime) {
-        setWalkingStatus('caution');
-        setSafetyScore(65);
-      } else {
-        setWalkingStatus('safe');
-        setSafetyScore(85);
+    const analyzeLocationSafety = async () => {
+      try {
+        const response = await aiAPI.analyzeLocation(
+          location.lat,
+          location.lng,
+          new Date().toISOString()
+        );
+
+        const { safety_score, status, factors } = response.data;
+
+        setSafetyScore(safety_score);
+        setWalkingStatus(status);
+
+        // Show alert if status changed to alert or caution with specific factors
+        if (status === 'alert' && factors.length > 0) {
+          addAlert('warning', factors[0]);
+        }
+      } catch (err) {
+        // Fallback to simple time-based analysis if API fails
+        console.error('Location safety analysis failed:', err);
+        const hour = new Date().getHours();
+        const isNightTime = hour < 6 || hour > 20;
+
+        if (isNightTime) {
+          setWalkingStatus('caution');
+          setSafetyScore(65);
+        } else {
+          setWalkingStatus('safe');
+          setSafetyScore(85);
+        }
       }
-    }
-  }, [location]);
+    };
+
+    // Analyze immediately and then every 2 minutes
+    analyzeLocationSafety();
+    const interval = setInterval(analyzeLocationSafety, 120000);
+
+    return () => clearInterval(interval);
+  }, [location, isWalking]);
 
   const triggerSOS = async () => {
     setSosActive(true);
@@ -280,6 +304,24 @@ const ProtegoApp = () => {
               onClearVoiceLogs={clearVoiceLogs}
             />
 
+            {/* AI Audio Monitor - Shows during active walk */}
+            {isWalking && (
+              <AudioMonitor
+                isWalking={isWalking}
+                sessionId={activeSession?.id}
+                locationLat={location?.lat}
+                locationLng={location?.lng}
+                onDistressDetected={(result) => {
+                  addAlert('warning', `AI detected: ${result.distress_type} (${Math.round(result.confidence * 100)}%)`);
+                }}
+              />
+            )}
+
+            {/* AI Safety Summary - Shows after walk ends */}
+            {!isWalking && activeSession && (
+              <SafetySummary sessionId={activeSession.id} compact />
+            )}
+
             <AlertsList alerts={alerts} />
           </div>
         )}
@@ -302,6 +344,9 @@ const ProtegoApp = () => {
         {/* Safety View */}
         {currentView === 'safety' && <SafetyView />}
       </div>
+
+      {/* AI Chat Assistant - Floating button */}
+      <AIChatAssistant floating />
     </div>
   );
 };

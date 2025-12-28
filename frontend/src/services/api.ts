@@ -143,4 +143,132 @@ export const userAPI = {
     api.delete('/users/me/trusted-contacts', { data: { phone } }),
 };
 
-export type { User, AuthResponse, UserData, TrustedContact };
+// AI API Types
+interface AudioAnalysisResponse {
+  transcription: string;
+  distress_detected: boolean;
+  distress_type: string;
+  confidence: number;
+  keywords_found: string[];
+  alert_triggered: boolean;
+  alert_id: number | null;
+}
+
+interface SafetySummaryResponse {
+  summary: string;
+  risk_level: string;
+  recommendations: string[];
+  alerts_analysis: string;
+  session_duration_minutes: number;
+  total_alerts: number;
+}
+
+interface ChatResponse {
+  response: string;
+  timestamp: string;
+}
+
+interface QuickAnalysisResponse {
+  is_emergency: boolean;
+  confidence: number;
+  distress_type: string;
+  analysis: string;
+  recommended_action: string;
+}
+
+interface AIStatusResponse {
+  whisper_configured: boolean;
+  megallm_configured: boolean;
+  test_mode: boolean;
+  model: string;
+  confidence_threshold: number;
+}
+
+interface LocationSafetyResponse {
+  safety_score: number;
+  status: string; // safe, caution, alert
+  risk_level: string; // low, medium, high
+  factors: string[];
+  recommendations: string[];
+  time_context?: {
+    hour: number;
+    is_night: boolean;
+    is_late_night: boolean;
+    day_of_week: string;
+  };
+  analyzed_at: string;
+}
+
+// AI API
+export const aiAPI = {
+  // Analyze audio file for distress
+  analyzeAudio: (
+    audioBlob: Blob,
+    sessionId?: number | null,
+    locationLat?: number | null,
+    locationLng?: number | null
+  ): Promise<AxiosResponse<AudioAnalysisResponse>> => {
+    const formData = new FormData();
+    formData.append('audio', audioBlob, 'recording.webm');
+    if (sessionId) formData.append('session_id', sessionId.toString());
+    if (locationLat) formData.append('location_lat', locationLat.toString());
+    if (locationLng) formData.append('location_lng', locationLng.toString());
+
+    return api.post('/ai/analyze/audio', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+      timeout: 60000, // 60 second timeout for audio processing
+    });
+  },
+
+  // Analyze text for safety concerns
+  analyzeText: (
+    text: string,
+    context?: string
+  ): Promise<AxiosResponse<QuickAnalysisResponse>> =>
+    api.post('/ai/analyze/text', { text, context }),
+
+  // Get safety summary for a session
+  getSessionSummary: (sessionId: number): Promise<AxiosResponse<SafetySummaryResponse>> =>
+    api.get(`/ai/summary/session/${sessionId}`),
+
+  // Get latest session summary
+  getLatestSummary: (): Promise<AxiosResponse<SafetySummaryResponse>> =>
+    api.get('/ai/summary/latest'),
+
+  // Chat with AI safety assistant
+  chat: (
+    message: string,
+    conversationHistory?: Array<{ role: string; content: string }>
+  ): Promise<AxiosResponse<ChatResponse>> =>
+    api.post('/ai/chat', { message, conversation_history: conversationHistory }),
+
+  // Get safety tips
+  getSafetyTips: (): Promise<AxiosResponse<{ tips: string; generated_at: string }>> =>
+    api.get('/ai/tips'),
+
+  // Get AI service status
+  getStatus: (): Promise<AxiosResponse<AIStatusResponse>> =>
+    api.get('/ai/status'),
+
+  // Analyze location safety
+  analyzeLocation: (
+    latitude: number,
+    longitude: number,
+    timestamp?: string,
+    context?: string
+  ): Promise<AxiosResponse<LocationSafetyResponse>> =>
+    api.post('/ai/analyze/location', { latitude, longitude, timestamp, context }),
+};
+
+export type {
+  User,
+  AuthResponse,
+  UserData,
+  TrustedContact,
+  AudioAnalysisResponse,
+  SafetySummaryResponse,
+  ChatResponse,
+  QuickAnalysisResponse,
+  AIStatusResponse,
+  LocationSafetyResponse,
+};
