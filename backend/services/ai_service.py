@@ -120,8 +120,8 @@ class AIService:
             import base64
 
             async with httpx.AsyncClient(timeout=60.0) as client:
-                # Chutes Whisper API expects base64 encoded audio in JSON
-                audio_base64 = base64.b64encode(audio_data).decode('utf-8')
+                # Chutes Whisper API expects base64 encoded audio as "audio_b64"
+                audio_b64 = base64.b64encode(audio_data).decode('utf-8')
 
                 headers = {
                     "Authorization": f"Bearer {self.whisper_api_key}",
@@ -129,10 +129,7 @@ class AIService:
                 }
 
                 payload = {
-                    "audio_base64": audio_base64,
-                    "task": "transcribe",
-                    "temperature": 0.0,
-                    "word_timestamps": False
+                    "audio_b64": audio_b64
                 }
 
                 response = await client.post(
@@ -145,27 +142,44 @@ class AIService:
                     logger.error(f"Whisper API error: {response.status_code} - {response.text}")
                     return []
 
-                result = response.json()
-                segments = []
+                # Chutes Whisper API returns text/plain, not JSON
+                content_type = response.headers.get("content-type", "")
 
-                # Parse response - handle different Whisper API formats
-                if "segments" in result:
-                    for seg in result["segments"]:
+                if "text/plain" in content_type or not content_type.startswith("application/json"):
+                    # Plain text response
+                    text = response.text.strip()
+                    if text:
+                        logger.info(f"Transcribed: {text[:100]}...")
+                        return [WhisperSegment(text=text, start=0.0, end=0.0)]
+                    return []
+
+                # Fallback: try JSON parsing for other Whisper API formats
+                try:
+                    result = response.json()
+                    segments = []
+
+                    if "segments" in result:
+                        for seg in result["segments"]:
+                            segments.append(WhisperSegment(
+                                text=seg.get("text", "").strip(),
+                                start=seg.get("start", 0.0),
+                                end=seg.get("end", 0.0)
+                            ))
+                    elif "text" in result:
                         segments.append(WhisperSegment(
-                            text=seg.get("text", "").strip(),
-                            start=seg.get("start", 0.0),
-                            end=seg.get("end", 0.0)
+                            text=result["text"].strip(),
+                            start=0.0,
+                            end=0.0
                         ))
-                elif "text" in result:
-                    # Simple text response without segments
-                    segments.append(WhisperSegment(
-                        text=result["text"].strip(),
-                        start=0.0,
-                        end=0.0
-                    ))
 
-                logger.info(f"Transcribed {len(segments)} segments")
-                return segments
+                    logger.info(f"Transcribed {len(segments)} segments")
+                    return segments
+                except Exception as json_err:
+                    # If JSON fails, treat as plain text
+                    text = response.text.strip()
+                    if text:
+                        return [WhisperSegment(text=text, start=0.0, end=0.0)]
+                    return []
 
         except Exception as e:
             logger.error(f"Whisper transcription error: {e}")
