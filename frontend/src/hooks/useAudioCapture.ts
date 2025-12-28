@@ -84,11 +84,9 @@ export function useAudioCapture(options: UseAudioCaptureOptions = {}) {
 
   // Start recording audio
   const startRecording = useCallback(async () => {
-    if (isRecording || isRecordingInProgressRef.current) {
-      // Only log if not already being handled by the lock
-      if (isRecording) {
-        addLog('Already recording', 'warning');
-      }
+    console.log('[Audio] startRecording called, isRecording:', isRecording, 'lock:', isRecordingInProgressRef.current);
+    if (isRecording) {
+      addLog('Already recording', 'warning');
       return false;
     }
 
@@ -220,15 +218,22 @@ export function useAudioCapture(options: UseAudioCaptureOptions = {}) {
       addLog(`Recording for ${durationMs / 1000}s...`, 'info');
 
       const started = await startRecording();
+      console.log('[Audio] startRecording returned:', started);
       if (!started) {
+        addLog('Failed to start recording', 'error');
         return null;
       }
 
       // Wait for the specified duration
       await new Promise(resolve => setTimeout(resolve, durationMs));
 
+      console.log('[Audio] Stopping recording...');
       const audioBlob = await stopRecording();
-      if (!audioBlob) return null;
+      console.log('[Audio] stopRecording returned blob:', audioBlob?.size);
+      if (!audioBlob) {
+        addLog('No audio blob returned', 'error');
+        return null;
+      }
 
       return await analyzeAudio(audioBlob);
     } finally {
