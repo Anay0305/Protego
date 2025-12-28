@@ -49,7 +49,11 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -
         expire = datetime.utcnow() + timedelta(days=7)  # Default 7 days
 
     to_encode.update({"exp": expire})
+    print(f"[AUTH DEBUG] Creating token with secret_key: {settings.secret_key[:20]}...")
+    print(f"[AUTH DEBUG] Creating token with algorithm: {settings.algorithm}")
+    print(f"[AUTH DEBUG] Token payload: {to_encode}")
     encoded_jwt = jwt.encode(to_encode, settings.secret_key, algorithm=settings.algorithm)
+    print(f"[AUTH DEBUG] Created token: {encoded_jwt[:50]}...")
     return encoded_jwt
 
 
@@ -67,9 +71,14 @@ def decode_access_token(token: str) -> dict:
         HTTPException: If token is invalid or expired
     """
     try:
+        print(f"[AUTH DEBUG] Decoding token: {token[:50]}...")
+        print(f"[AUTH DEBUG] Using secret_key: {settings.secret_key[:20]}...")
+        print(f"[AUTH DEBUG] Using algorithm: {settings.algorithm}")
         payload = jwt.decode(token, settings.secret_key, algorithms=[settings.algorithm])
+        print(f"[AUTH DEBUG] Decoded payload: {payload}")
         return payload
-    except JWTError:
+    except JWTError as e:
+        print(f"[AUTH DEBUG] JWTError: {e}")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Could not validate credentials",
@@ -94,11 +103,16 @@ def get_current_user(
     Raises:
         HTTPException: If authentication fails
     """
+    print(f"[AUTH DEBUG] get_current_user called")
+    print(f"[AUTH DEBUG] credentials: {credentials}")
     token = credentials.credentials
+    print(f"[AUTH DEBUG] token from credentials: {token[:50] if token else 'None'}...")
     payload = decode_access_token(token)
 
     user_id_raw = payload.get("sub")
+    print(f"[AUTH DEBUG] user_id_raw from payload: {user_id_raw}, type: {type(user_id_raw)}")
     if user_id_raw is None:
+        print("[AUTH DEBUG] user_id_raw is None!")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Could not validate credentials",
@@ -108,21 +122,27 @@ def get_current_user(
     # Convert to int (JWT returns strings)
     try:
         user_id = int(user_id_raw)
-    except (ValueError, TypeError):
+        print(f"[AUTH DEBUG] converted user_id: {user_id}")
+    except (ValueError, TypeError) as e:
+        print(f"[AUTH DEBUG] Failed to convert user_id: {e}")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Could not validate credentials",
             headers={"WWW-Authenticate": "Bearer"},
         )
 
+    print(f"[AUTH DEBUG] Looking up user with id={user_id}")
     user = db.query(User).filter(User.id == user_id).first()
+    print(f"[AUTH DEBUG] User lookup result: {user}")
     if user is None:
+        print(f"[AUTH DEBUG] User with id={user_id} not found!")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="User not found",
             headers={"WWW-Authenticate": "Bearer"},
         )
 
+    print(f"[AUTH DEBUG] Successfully authenticated user: {user.email}")
     return user
 
 
