@@ -140,23 +140,25 @@ export function useAudioCapture(options: UseAudioCaptureOptions = {}) {
   // Stop recording and return blob
   const stopRecording = useCallback((): Promise<Blob | null> => {
     return new Promise((resolve) => {
-      if (!mediaRecorderRef.current || !isRecording) {
+      const recorder = mediaRecorderRef.current;
+      // Check recorder state directly instead of React state (which may be stale)
+      if (!recorder || recorder.state === 'inactive') {
         addLog('Not recording', 'warning');
         resolve(null);
         return;
       }
 
-      mediaRecorderRef.current.onstop = () => {
-        const mimeType = mediaRecorderRef.current?.mimeType || 'audio/webm';
+      recorder.onstop = () => {
+        const mimeType = recorder.mimeType || 'audio/webm';
         const audioBlob = new Blob(audioChunksRef.current, { type: mimeType });
         addLog(`Recording stopped. Size: ${(audioBlob.size / 1024).toFixed(1)}KB`, 'info');
         setIsRecording(false);
         resolve(audioBlob);
       };
 
-      mediaRecorderRef.current.stop();
+      recorder.stop();
     });
-  }, [isRecording, addLog]);
+  }, [addLog]);
 
   // Analyze audio blob using AI
   const analyzeAudio = useCallback(async (audioBlob: Blob): Promise<AudioAnalysisResult | null> => {
