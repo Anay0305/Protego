@@ -295,7 +295,7 @@ Provide your safety analysis in JSON format."""
                             {"role": "user", "content": user_prompt}
                         ],
                         "temperature": 0.3,
-                        "max_tokens": 500
+                        "max_tokens": 4000
                     }
                 )
 
@@ -398,7 +398,7 @@ Provide a JSON response with:
                             {"role": "user", "content": prompt}
                         ],
                         "temperature": 0.5,
-                        "max_tokens": 600
+                        "max_tokens": 4000
                     }
                 )
 
@@ -482,7 +482,7 @@ Be warm, supportive, and concise. Focus on practical safety advice."""
                         "model": self.megallm_model,
                         "messages": messages,
                         "temperature": 0.7,
-                        "max_tokens": 300
+                        "max_tokens": 4000
                     }
                 )
 
@@ -634,7 +634,7 @@ Be realistic but not alarmist. Focus on actionable advice."""
                             {"role": "user", "content": prompt}
                         ],
                         "temperature": 0.4,
-                        "max_tokens": 500
+                        "max_tokens": 4000
                     }
                 )
 
