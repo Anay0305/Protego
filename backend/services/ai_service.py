@@ -117,19 +117,27 @@ class AIService:
             )]
 
         try:
+            import base64
+
             async with httpx.AsyncClient(timeout=60.0) as client:
-                # Prepare multipart form data
-                files = {
-                    "file": (filename, audio_data, content_type)
-                }
+                # Chutes Whisper API expects base64 encoded audio in JSON
+                audio_base64 = base64.b64encode(audio_data).decode('utf-8')
 
                 headers = {
-                    "Authorization": f"Bearer {self.whisper_api_key}"
+                    "Authorization": f"Bearer {self.whisper_api_key}",
+                    "Content-Type": "application/json"
+                }
+
+                payload = {
+                    "audio_base64": audio_base64,
+                    "task": "transcribe",
+                    "temperature": 0.0,
+                    "word_timestamps": False
                 }
 
                 response = await client.post(
                     self.whisper_endpoint,
-                    files=files,
+                    json=payload,
                     headers=headers
                 )
 
