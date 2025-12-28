@@ -105,12 +105,15 @@ async def analyze_audio(
 
     If distress is detected with high confidence, automatically creates an alert.
     """
-    # Validate file type
-    allowed_types = ["audio/webm", "audio/wav", "audio/mp3", "audio/mpeg", "audio/ogg", "audio/m4a"]
-    if audio.content_type and audio.content_type not in allowed_types:
+    # Validate file type (allow codec suffixes like audio/webm;codecs=opus)
+    allowed_types = ["audio/webm", "audio/wav", "audio/mp3", "audio/mpeg", "audio/ogg", "audio/m4a", "audio/mp4"]
+    content_type = audio.content_type or ""
+    # Extract base MIME type (before semicolon for codecs)
+    base_type = content_type.split(";")[0].strip()
+    if base_type and base_type not in allowed_types:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Unsupported audio format. Allowed: {', '.join(allowed_types)}"
+            detail=f"Unsupported audio format '{content_type}'. Allowed: {', '.join(allowed_types)}"
         )
 
     # Read audio data
