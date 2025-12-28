@@ -147,44 +147,51 @@ class AIService:
                     logger.error(f"Whisper API error: {response.status_code} - {response.text}")
                     return []
 
-                # Chutes Whisper API returns text/plain, not JSON
+                # Parse response - Chutes API returns JSON array of segments
                 content_type = response.headers.get("content-type", "")
+                segments = []
 
-                if "text/plain" in content_type or not content_type.startswith("application/json"):
+                if "application/json" in content_type:
+                    try:
+                        result = response.json()
+                        logger.info(f"[Whisper] Parsed JSON type: {type(result)}")
+
+                        # Chutes API returns array: [{"start": 0.0, "end": 3.0, "text": "..."}]
+                        if isinstance(result, list):
+                            for seg in result:
+                                text = seg.get("text", "").strip()
+                                if text:
+                                    segments.append(WhisperSegment(
+                                        text=text,
+                                        start=seg.get("start", 0.0),
+                                        end=seg.get("end", 0.0)
+                                    ))
+                        # Object with segments key
+                        elif isinstance(result, dict) and "segments" in result:
+                            for seg in result["segments"]:
+                                text = seg.get("text", "").strip()
+                                if text:
+                                    segments.append(WhisperSegment(
+                                        text=text,
+                                        start=seg.get("start", 0.0),
+                                        end=seg.get("end", 0.0)
+                                    ))
+                        # Object with text key
+                        elif isinstance(result, dict) and "text" in result:
+                            text = result["text"].strip()
+                            if text:
+                                segments.append(WhisperSegment(text=text, start=0.0, end=0.0))
+
+                    except Exception as json_err:
+                        logger.error(f"[Whisper] JSON parse error: {json_err}")
+                else:
                     # Plain text response
                     text = response.text.strip()
                     if text:
-                        logger.info(f"Transcribed: {text[:100]}...")
-                        return [WhisperSegment(text=text, start=0.0, end=0.0)]
-                    return []
+                        segments.append(WhisperSegment(text=text, start=0.0, end=0.0))
 
-                # Fallback: try JSON parsing for other Whisper API formats
-                try:
-                    result = response.json()
-                    segments = []
-
-                    if "segments" in result:
-                        for seg in result["segments"]:
-                            segments.append(WhisperSegment(
-                                text=seg.get("text", "").strip(),
-                                start=seg.get("start", 0.0),
-                                end=seg.get("end", 0.0)
-                            ))
-                    elif "text" in result:
-                        segments.append(WhisperSegment(
-                            text=result["text"].strip(),
-                            start=0.0,
-                            end=0.0
-                        ))
-
-                    logger.info(f"Transcribed {len(segments)} segments")
-                    return segments
-                except Exception as json_err:
-                    # If JSON fails, treat as plain text
-                    text = response.text.strip()
-                    if text:
-                        return [WhisperSegment(text=text, start=0.0, end=0.0)]
-                    return []
+                logger.info(f"[Whisper] Transcribed {len(segments)} segments: {[s.text for s in segments]}")
+                return segments
 
         except Exception as e:
             logger.error(f"Whisper transcription error: {e}")
