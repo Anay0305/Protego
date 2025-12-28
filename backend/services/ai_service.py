@@ -117,11 +117,12 @@ class AIService:
             )]
 
         try:
-            import base64
-
             async with httpx.AsyncClient(timeout=60.0) as client:
                 # Chutes Whisper API expects base64 encoded audio as "audio_b64"
                 audio_b64 = base64.b64encode(audio_data).decode('utf-8')
+
+                logger.info(f"[Whisper] Audio size: {len(audio_data)} bytes, base64 length: {len(audio_b64)}")
+                logger.info(f"[Whisper] Endpoint: {self.whisper_endpoint}")
 
                 headers = {
                     "Authorization": f"Bearer {self.whisper_api_key}",
@@ -137,6 +138,10 @@ class AIService:
                     json=payload,
                     headers=headers
                 )
+
+                logger.info(f"[Whisper] Response status: {response.status_code}")
+                logger.info(f"[Whisper] Response headers: {dict(response.headers)}")
+                logger.info(f"[Whisper] Response text (first 500 chars): {response.text[:500] if response.text else 'EMPTY'}")
 
                 if response.status_code != 200:
                     logger.error(f"Whisper API error: {response.status_code} - {response.text}")
