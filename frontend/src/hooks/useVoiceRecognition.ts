@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 
 interface VoiceLog {
   timestamp: string;
@@ -17,6 +17,24 @@ export function useVoiceRecognition(
   const recognitionRef = useRef<any>(null);
   const lastAlertTimeRef = useRef(0);
   const alertCooldownMs = 30000;
+
+  // Use refs for callbacks to avoid re-initializing recognition on callback changes
+  const onVoiceAlertRef = useRef(onVoiceAlert);
+  const isWalkingRef = useRef(isWalking);
+  const voiceEnabledRef = useRef(voiceEnabled);
+
+  // Keep refs updated
+  useEffect(() => {
+    onVoiceAlertRef.current = onVoiceAlert;
+  }, [onVoiceAlert]);
+
+  useEffect(() => {
+    isWalkingRef.current = isWalking;
+  }, [isWalking]);
+
+  useEffect(() => {
+    voiceEnabledRef.current = voiceEnabled;
+  }, [voiceEnabled]);
 
   const addLog = (message: string, type: string = 'info') => {
     const timestamp = new Date().toLocaleTimeString();
@@ -50,7 +68,8 @@ export function useVoiceRecognition(
 
     recognition.onend = () => {
       setIsListening(false);
-      if (isWalking && voiceEnabled) {
+      // Use refs to get current values without causing re-renders
+      if (isWalkingRef.current && voiceEnabledRef.current) {
         addLog('Auto-restarting voice recognition...', 'info');
         try {
           recognition.start();
@@ -86,7 +105,8 @@ export function useVoiceRecognition(
 
         addLog('"HELP ME" DETECTED! Triggering emergency alert...', 'warning');
         lastAlertTimeRef.current = now;
-        onVoiceAlert();
+        // Use ref to call the current callback
+        onVoiceAlertRef.current();
       }
     };
 
@@ -98,7 +118,8 @@ export function useVoiceRecognition(
         addLog('Voice recognition cleaned up', 'info');
       }
     };
-  }, [isWalking, voiceEnabled, onVoiceAlert]);
+  // Only run once on mount - use refs for dynamic values
+  }, []);
 
   // Start/stop voice recognition based on state
   useEffect(() => {
