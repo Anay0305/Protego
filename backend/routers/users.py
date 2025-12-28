@@ -63,8 +63,8 @@ def signup(user_data: UserCreate, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(new_user)
 
-    # Create access token
-    access_token = create_access_token(data={"sub": new_user.id})
+    # Create access token - sub must be a string per JWT spec
+    access_token = create_access_token(data={"sub": str(new_user.id)})
 
     return AuthResponse(
         access_token=access_token,
@@ -95,8 +95,8 @@ def signin(credentials: UserLogin, db: Session = Depends(get_db)):
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    # Create access token
-    access_token = create_access_token(data={"sub": user.id})
+    # Create access token - sub must be a string per JWT spec
+    access_token = create_access_token(data={"sub": str(user.id)})
 
     return AuthResponse(
         access_token=access_token,
