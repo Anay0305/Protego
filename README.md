@@ -6,6 +6,13 @@
 ![React](https://img.shields.io/badge/react-18.2-blue)
 
 A production-quality full-stack application for personal safety monitoring with AI-powered distress detection, real-time alerts, and emergency contact notifications.
+## The Team
+- Anay Gupta
+- Tejas Bal
+- Athrv Aggarwal
+- Danish Dhanjal
+- Mannat Kaur
+
 
 ## 🚀 Features
 
